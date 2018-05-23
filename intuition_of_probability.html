@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Stistical Intuitions</title>
+    <link href="style.css" rel="stylesheet" type="text/css" />
+</head>
+<body>
+<div id="wrapper">
+    
+    <!--div id="header">
+        <div id="nav"><a href="http://spandanmadan.com"> About Me</a> | <a href="https://medium.com/@spandanmadan">Blog</a> | <a href="https://www.youtube.com/channel/UCIuK5Wa9HKenvAddpZyL-yA?view_as=subscriber">Talks</a> | <a href="http://people.csail.mit.edu/smadan/web/tutorials.html">Online Tutorials</a> </div> 
+        <div id="bg"></div>
+    </div-->
+    
+    <div id="main-content">   
+        <div class="box">
+            <h1 style="padding-bottom: 0px">Why is probability = Number of favourable events/Number of total events?</h1>
+            <p style="padding-top: 0px">Read other posts on the blog <a href="index.html"> Statistical Intuitions</a></p>
+        </div>
+
+        <p>Background:- If there's any process whose outcome you do not know for certain, it's a random experiment. Now, there may be many possible outcomes, but not all of them are equally likely. Probability allows us to quantify how likely one outcome is as compared to another.</p>
+
+        <p>
+        However, for a lot of such experiments (processes), the outcomes can be symmetric. So, there's no reason to believe that one of them is more likely than the other. For example, will it rain today? Yes/No may have different probability depending on today's weather. Throwing a dice or a coin, will it land on 1-6, or Head/Tail? The symmetric geometry of a dice or coin ensures that no one outcome is more likely than the other.</p>
+
+        <p>So, let's assume that the probability of getting a 2 on top of the dice is x. Now, we know that the dice can only have 6 outcomes, and that there's no reason to believe any one is more probable than the other, i.e. they are all equally likely. By definition (axiom 1), the probability of getting at least one possible outcome is 1. So, the probability of getting 1,2,3,4,5 or 6 = 1.</p>
+
+        <p>Now, since getting a 2 or getting a 3 are mutually exclusive, the probability of getting a 2 or 3 = probability of getting 2 + probability of getting 3. So, probability of getting 1,2,3,4,5, or 6 = P(1) + P(2) + P(3) + P(4) + P(5) + P(6) = x + x + x .... = 6x. So, 6x = 1, or x = 1/6.</p>
+
+        <p> Now, let's consider the probability of an event P(even number on top). P(even on top) = P(2 or 4 or 6) = P(2) + P(4) + P(6) [since, mutually exclusive/non-overlapping again). = 3x = 3*1/6 = 1/2.</p>
+
+
+        <p>More Generally :- IF and only IF you can design an experiment with mutually exclusive and equally likely events, like coin toss, dice roll etc. Then, each possible outcome is equally likely and equal to 1/N. If you have an event which is true for K of these possible outcomes, then K = Number of favourable outcomes. So, probability of the event = 1/N + 1/N ..... K times = K/N = # of favourable events/ # of total events.
+        </p> 
+    </div>
+    <div id="footer">
+        Please feel free to write to me at smadan@mit.edu
+    </div>
+</div>
+
+</body>
+</html>

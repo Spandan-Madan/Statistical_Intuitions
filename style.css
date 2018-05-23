@@ -1,8 +1,8 @@
 /* Layout */
 
 body {
-    font:normal 12px/1.6em Arial, Helvetica, sans-serif;
-	color:#2a3845;
+    font:normal 13px/1.6em roboto;
+	color:#000028;
 	margin:0;
 	padding:0;
 	background:#FFFFFF;
@@ -77,26 +77,26 @@ a:hover {
 }
 
 h1 {
-	color:#7a2e40;
+	color:#002800;
 	margin:0 0 10px;
 	padding-bottom:10px;
-	font:normal 17px Georgia, serif;
+	font:normal 20px roboto;
 	border-bottom:1px solid #efece7;
 }
 
 h2 {
-	color:#7a2e40;
+	color:#002800;
 	margin:20px 0 10px;
 	padding-bottom:10px;
-	font:normal 17px Georgia, serif;
+	font:normal 18px roboto;
 	border-bottom:1px solid #efece7;
 }
 
 h3 {
-	color:#7a2e40;
+	color:#002800;
 	margin:10px 0;
 	padding-bottom:10px;
-	font:bold 14px Arial, Helvetica, sans-serif;
+	font:bold 14px roboto;
 	border-bottom:1px solid #efece7;
 }
 
@@ -107,16 +107,16 @@ ul {
 }
 
 .box {
-	background:#f7f7f7;
+	background:#ededed;
 	border:1px solid #f0e9eb;
 	padding:15px;
 }
 
 #nav {
-	background:#06a;
+	background:#4CAF50;
 	padding:10px 20px;
 	text-align:right;
-	color:#f6dde3;
+	color:white;
 }
 
 #nav a {
@@ -125,7 +125,7 @@ ul {
 
 #nav a:visited, #nav a:link {
 	text-decoration:none;
-	color:#f6dde3;
+	color:white;
 }
 
 #nav a:hover {
@@ -135,6 +135,6 @@ ul {
 
 #logo {
 	margin-bottom:20px;
-	font:normal 18px Georgia, serif;
+	font:normal 18px roboto;
 	color:#fa7393;
 }
