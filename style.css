@@ -1,7 +1,7 @@
 /* Layout */
 
 body {
-    font:normal 13px/1.6em roboto;
+    font:normal 18px/1.6em roboto;
 	color:#000028;
 	margin:0;
 	padding:0;
@@ -80,15 +80,17 @@ h1 {
 	color:#002800;
 	margin:0 0 10px;
 	padding-bottom:10px;
-	font:normal 20px roboto;
+	font:normal 28px roboto;
+	font-weight: 700;
 	border-bottom:1px solid #efece7;
 }
 
 h2 {
 	color:#002800;
-	margin:20px 0 10px;
+	margin:24px 0 10px;
 	padding-bottom:10px;
-	font:normal 18px roboto;
+	font:normal 24px roboto;
+	font-weight: 600;
 	border-bottom:1px solid #efece7;
 }
 
@@ -96,13 +98,21 @@ h3 {
 	color:#002800;
 	margin:10px 0;
 	padding-bottom:10px;
-	font:bold 14px roboto;
+	font:bold 25px roboto;
 	border-bottom:1px solid #efece7;
+}
+
+h4 {
+	color:#002800;
+	margin:10px 0;
+	padding-bottom:10px;
+	font:bold 22px roboto;
+	/*border-bottom:1px solid #efece7;*/
 }
 
 ul {
 	padding:0;
-	margin:0 0 0 17px;
+	margin:0 0 0 22px;
 	list-style:square url('http://img525.imageshack.us/img525/1890/bulletr.gif');
 }
 
@@ -134,7 +144,8 @@ ul {
 }
 
 #logo {
+	margin-top:20px;
 	margin-bottom:20px;
-	font:normal 18px roboto;
+	font:normal 20px roboto;
 	color:#fa7393;
 }
