@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Statistical Intuitions</title>
+    <link href="style.css" rel="stylesheet" type="text/css" />
+</head>
+<body>
+<div id="wrapper">
+    
+    <div id="main-content">   
+        <div class="box">
+            <h1 style="padding-bottom: 0px">Why is probability = Number of favourable events/Number of total events?</h1>
+            <p style="padding-top: 0px">Read other posts on the blog <a href="index.html"> Statistical Intuitions</a></p>
+        </div>
+
+		<h2> Introduction </h2>
+
+		<p> Probability is often called the mathematics of uncertainity. The importance of this branch of mathematics can hardly be overstated. From the google's search results, to meaningful exit polls in elections, applications of probability surround us. To quote Pierre Simon Laplace: It is remarkable that a science which began with the consideration of games of chance should have become the most important object of human knowledge. Yet, all we seem to be studying in a probability class in school is coin tosses, dice rolls, and sometimes the probability of drawing a red or a black ball from an urn/bag full of balls. If I was to ask you why you think you had to toil endlessly on these specific problem settings, your answer would be "they're simple examples". And my question to you would be "simple, how? What exactly makes them simple?". We are explained probability through these simpler cases, while it is never made clear what are the assumptions of simplicity in these examples. Furthermore, we are given a formulaic definition of probability without an intuition for why it is true. </p><br> 
+
+		<p> The goal of this post is to shed some light on these details. While a whole bedrock of mathematics underpins these ideas, the goal of this post is to make it intuitive and easy to read. For just as paintings are not just to be appreciated by critics but you and me as well, mathematics must be appreciable to laymen and not just advanced mathematicians. Let us begin with a background to bring all readers up to speed with the vocabulary of basics needed to understand the post.</p>
+
+		<h2> Background </h2>
+		<p> Uncertaininty surrounds us everywhere. Trying to cross the road? Will the car stop and let you pass, or should you stop? Scheduling a football match? Will it rain on a particular day or not? Studying for an exam? What concepts will be tested on the exam, and which ones won't be? The car on the road, the weather on the day of the match, or how your professor decides to set an exam paper all are examples of processes whose outcome cannot be known for certain beforehand. Once they are done, the answer is known with complete certainity. Millions of such little processes pass by every single day in front of our eyes every single day. </p><br>
+
+		<p> Yet, the outcomes of these processes seldom surprise us. For example, if a car is moving at a high speed, it's more probable that it won't stop and you should let it pass before crossing the road. Not all outcomes are equally liely, some are more "probable". Probability provides us with the tools to make sense of this uncertainity rigorously. When I say rigorous, I mean that we can assign a number to this relative likelihood of possible outcomes, we understand how and why this number is assigned, and most importantly, it provides us a language to communicate this number to others such that we all will agree on it.</p><br>
+
+
+		<p><b>Some definitions:-</b><br>
+		Random Experiment: Any process for which the outcome is not know for certain. It is "random" in the sense that the outcome cannot be predicted beforehad. For example, will the car stop?</p><br>
+
+		<p>Outcome: What happens when the random experiment (process is finished). For example, the car stopped for you to cross the road.</p><br>
+
+		<p>Possile outcomes: What all could have happened. For example, 1) The car could have stopped, 2) The car could have not stopped. <br>
+
+		For the cases we usually study (coin toss, dice roll etc), possible outcomes always seem to be the same. Heads/Tails, or the number 1-6 showing up on the top of the dice. But it is important to understand that the list of possible outcomes depends upon the question you care about. For example, let us consider a new problem: How many minutes before the deadline will you submit your next assignment? It sure is a random experiment, because we don't know it beforehand. But how do we list the possible outcomes? We could say it may be 1 minute, 2 minutes, 3 minutes and so on. OR we could go more fine grained and say it may be 10 seconds, 11 seconds, 12 seconds and so on. Both are perfectly valid list of possible outcomes and depending upon what we care about we can define a list of outcomes. We can be sure that the actual time of when you submit it will definitely be one of the possible outcomes.</p><br>
+
+		<p>Event: Whether or not a particular subset of possible outcomes occured when the experiment finished. For example, getting an even number on top of a dice roll. It can be thought of as a combination of the outcomes getting 2,4 or 6 on top. When the experiment finishes, the event can either be True or False. If we get a 2, then the event "Even number on Top" is true. If we got 3, then the Event would have been False.
+
+		<h2> Let the fun begin </h2>
+
+		<p>Simple question. You toss a coin, what's the probability of a Head showing up? We can all agree that it is 50% probable (or probability = 1/2) that a Heads shows up, and 50% probable that a Tails show up. If this was not the case, a coin toss would not be a fair way to decide things, which we know from experience it is.</p><br>
+
+		<p> Back in high school, we all arrived at the answer of 1/2, and not from experience but based on the formula of probability. The formula we were taught was :- <br>
+
+		<p> Probability  = Number of favorable outcomes/ Number of total possible outcomes. </p><br>
+
+		<p> So, in this case, total outcomes = 2 (Heads, Tails) and favourable = 1 (Heads). So Probability of getting a Heads, or P(Heads) = 1/2.<br>
+
+		Great, let's look at another example. What is the probability of getting an even number if you roll a dice? Well, let's go back to our formula.</p><br>
+
+		<p> Total possible outcomes = 6, because it has to be one of 1,2,3,4,5 or 6.<br>
+		Favorable outcomes = 3, because if it is 2,4 or 6 then the number on top is even. <br><br>
+
+		So, P(even number on top) = 3/6 = 1/2.<br><br>
+
+		So far so good. Let's look at the last example described above now - How many minutes before the deadline will you submit the assignment. For simplicity of math, let's assume the assignment is due 7 days after it is released. Let's calculate the probability of you submitting it at the very last minute. <br><br>
+
+		Total possible outcomes = All possible minutes in 7 days = 10080.<br>
+		Favourale outcomes = 1, the last minute of the deadline.<br>
+		P(Assignment submitted at last minute) = 1/10080.<br>
+
+		Now, let's get the probability that you will submit it on the very first minute when it was released. That is, you solved and submitted the assigment in just 1 minute. <br><br>
+
+		Favourable outcomes = 1 again, the first minute after the assignment was released.<br>
+		P(Assignment submitted at first minute) = 1/10080.<br><br>
+
+		Well, that doesn't seem right. We know for a fact that most students will be submitting the assignment in the last minute. There's just no way an assignment could be solved in the first minute and submitted anyway. Then, how are the probabilities of these two outcomes equal? What went wrong. Is the formula wrong? Why does it work for dice and coins, but is absolutely useless for an actual problem in the real world?</p>
+
+		<h2> Assumptions are everything </h2>
+
+		The answer to the above conundrum is that the formula is not wrong. Well, at least not always. It works sometimes. For problems in high school math books it works perfectly, so let's try to understand why. There's 2 major assumptions that are needed to make the formula work. It didn't work in the above case because the assignment example doesn't follow one of these assumptions! But before we go any further, we need to go through some more background.
+
+		<h2> Background revisited </h2>
+
+		<h4> The Sum to 1 Rule </h4>
+		Probability of all outcomes: What is the probability that you'll get a head or a tail on a coin toss? It is 1, because one of the outcomes MUST happen. A probability of 1 means something is 100% probable, i.e. will happen for sure. Another example of this is Probability that a number from 1-6 will show up on a dice roll. So, probability of at least one of the outcomes happening is 1. Let us call this the sum-to-1 rule.
+
+		<h4> The special property </h4>
+		Non-overlapping outcomes: Outcomes that can't happen simultaneously. For example, in a dice roll the number on the top can't be both even and odd simultaneously. Whatever number you get will either be even or odd. How about outcome A: Number on top divisible by 2, and outcome B: Number on top divisible by 3? Outcome A and B are overlapping, because if 6 shows up on the dice, it will be divisible by both 2 and 3.  Non-overlapping outcomes are called "Mutually Exclusive" in mathematical terms, but I always found non-overlapping more intuitive. 
+
+		<p>If you think about it, Heads/Tails, 1-6 on top of dice, even/odd on top of dice are all examples of non-overlapping outcomes. They show up very often, because they have a special property. This property is -<br><br>
+
+		P(Non-overlapping outcomes A or B happening) = P(outcome A) + P(outcome B)<br><br>
+
+		For example, P(even number on top) = P(2,4 or 6 on top) = P(2 on top) + P(4 on top) + P(6 on top)<br><br>
+
+		As shown above, each of these is 1/6, so the sum is 3/6. Which is also what we got from our formula for probability. Great, this property seems to be working. Does it work for non-overlapping outcomes?<br><br>
+
+		P(number on top divisbile by 2 or 3) = P(2,3, 4 or 6 on top) = 4/6. If we used the property, we'll get:-<br><br>
+
+		P(divisible by 2) + P(divisible by 3) = P(2,4 or 6 on top) + P(3 or 6 on top) = 3/6 + 2/6 = 5/6. Which is incorrect. And it's happening because we've doubly counted the overlapping part of these outcomes. (6 on top). So, this is a special property which works only for non-overlapping outcomes. That is, if we decided a list of possible outcomes (remember we pick it ourselves as mentioned before) such that they are non-overlapping, we can make use of this special property. <br><br></p>
+
+		<h2> From axioms to dice rolls </h2>
+
+		Let's consider the simple case of the Dice roll, where the formula was working fine.<br><br>
+
+		Let's say we were never given the formula to get the probability by counting the favourable and total outcomes. Instead, we are only given the Sum-to-1 Rule, and the Special Property. Well, your first question should be why is this a fair position to start with. And the answer is it's fair because the way mathematics works is that we start with some "Axioms", i.e. non-questionable assumptions which we say are True, and using them to infer useful properties which must be true if Axioms are true. These are called "Theorems". Axioms are extremely intuitive and often "obvious". Both the sum-to-1 rule and the special property of non-overlapping events are axioms. They are both obvious and intuitive. For example, the sum-to-1 rule says that at least one outcome must occur, which is obviously hard to argue with because if you throw a dice with 1-6 written on it, one of them must obviously show up.<br><br>
+
+		Starting from these axioms, let's get the probability of getting a 2 on the top. Since we don't know the probability of getting a 2 on top of the dice, let us just assume that it is x. <br><br>
+
+		Since getting any two numbers like 2 or 3 on top are non-overlapping, using the special property, probability of getting 1,2,3,4,5, or 6 = P(1) + P(2) + P(3) + P(4) + P(5) + P(6)<br><br>
+
+		Given the symmetric geometry of a cube, there's no reason to believe that getting a 1 on top one is more probable than getting another number like 2 on top i.e. they are all equally likely. So, probability of getting each of the numbers on top is = x.<br><br>
+
+		So, P(1,2,3,4,5 or 6) = P(1) + P(2) + P(3) + P(4) + P(5) + P(6) = x + x + x ... 6 times = 6x.<br><br>
+
+		Now, By sum-to-1 rule, the probability of getting at least one out of 1-6 should be 1.<br><br>
+
+
+		That is, 6x = 1, or x = 1/6.<br><br>
+
+		<h2> Why did this work? </h2>
+
+		We used the following things:-
+		1) We chose a list of possible outcomes which were non-overlapping. This gave us access to the special property axiom.
+		2) We were interested in one of them occuring, so we assumed it to be x. 
+		3) Because the dice is symmetric, they were all equally likely to occur. So, each one the possible outcomes was x.
+		5) We asked, what is the probability of at least one of these occuring? According to Sum-to-1 rule, this must have been 1.
+		6) Using point 1 and 2 above, we got an expression for probability of at least these occuring in terms of x.
+		7) We equalled this expression to 1, to get the value of x.
+
+		<h2> What broke down for the example of assignment deadlines </h2>
+
+		Now, we are ready to understand why it didn't work for assignments, but worked for dice and coins. Stop reading this right here and try to guess which one the points in the list above does not hold true for time between assignments submission and deadline. If you think it's point 3, you're right. While the geometry of a coin and a dice ensures that all outcomes are equally likely, this is not true for assignments. The probability of you submitting your assignment in the last minute is NOT the same as you submitting it in the first minute after the assignment is released! Everything else works just fine! The outcomes are still non-overlapping. The 2 axioms still work (They always do). The symmetry is broken down, that's all.
+
+		<h2>The General formula</h2>
+
+		<p>IF AND ONLY IF you choose a list of possible outcomes that is non-overlapping, and all outcomes are equally likely. Let's assume that probability of one of these outcomes occuring is x, so automatically it is x for any of the possible outcomes. Let's say total possible outcomes is N. (So, N = 2 for coin tosses, 6 for dice rolls).<br><br>
+
+		P(At least one outcome occuring) = P(outcome 1 occuring) + P(outcome 2 occuring) + .... + P(outcome N occuring), using special property.
+		As each of them is x, P(At least one outcome occuring) = x + x + x + .... N times = N*x.<br><br>
+
+		By Sum-to-1 rule, P(At least one of them occuring) = 1.<br><br>
+		So, N*x = 1.
+
+		Thus, x = 1/N.<br><br>
+
+
+		If you have an event which is true for K of these possible outcomes, P(E) = P(favourable outcome 1) + P(favourable outcome 2) + ... K times.
+		So, probability of the event = 1/N + 1/N ..... K times = K/N = Number of favourable events/ Number of total events.<br><br>
+
+		If you ever wondered what it feels like to invent mathematics, imagine thinking all of this through all by yourself, for the first time, with no blog or book to help you out. No wonder people like me and you are not mathematicians. No worries, we can still take a moment to appreciate the beauty of it, if not create it ourselves! 
+
+
+		<br><br>Hoping this post was helpful in building your intuition about probability, signing off, Spandan Madan!<br><br></p>
+    </div>
+    <div id="footer">
+        Please feel free to write to me at smadan@mit.edu
+    </div>
+</div>
+
+</body>
+</html>
