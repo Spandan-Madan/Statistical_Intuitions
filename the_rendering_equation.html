@@ -6,23 +6,24 @@
 </head>
 <body>
 <div id="wrapper">
-    
-    <div id="main-content">   
+
+    <div id="main-content">
         <div class="box">
-            <h1 style="padding-bottom: 0px">Why is probability = Number of favourable events/Number of total events?</h1>
-            <p style="padding-top: 0px">Read other posts on the blog <a href="index.html"> Statistical Intuitions</a></p>
+            <h1 style="padding-bottom: 0px">The rendering equation</h1>
+            <h2 style="padding-bottom: 0px">James Kajiya, 1986</h2>
+            <p style="padding-top: 0px">Part of the "Sunday Classic Paper" series. Read other posts on the blog <a href="index.html"> Statistical Intuitions</a></p>
         </div>
 
-		<h2> Introduction </h2>
+		<h2> Introducing - The Sunday Classic Paper! </h2>
 
-		<p> Probability is often called the mathematics of uncertainity. The importance of this branch of mathematics can hardly be overstated. From the google's search results, to meaningful exit polls in elections, applications of probability surround us. To quote Pierre Simon Laplace: It is remarkable that a science which began with the consideration of games of chance should have become the most important object of human knowledge. Yet, all we seem to be studying in a probability class in school is coin tosses, dice rolls, and sometimes the probability of drawing a red or a black ball from an urn/bag full of balls. If I was to ask you why you think you had to toil endlessly on these specific problem settings, your answer would be "they're simple examples". And my question to you would be "simple, how? What exactly makes them simple?". We are explained probability through these simpler cases, while it is never made clear what are the assumptions of simplicity in these examples. Furthermore, we are given a formulaic definition of probability without an intuition for why it is true. </p><br> 
+		<p> As a part of a new move to read papers I wouldn't otherwise read, I am starting a new series called Sunday Classic Paper. Which is basically me forcing myself to read an interesting classic paper every week. This post covers the seminal paper in Computer Graphics - <a href="https://citeseerx.ist.psu.edu/viewdoc/download;?doi=10.1.1.63.1402&rep=rep1&type=pdf">"The Rendering Equation"</a>, by James Kajiya of Caltech, written in 1986.</p>
 
-		<p> The goal of this post is to shed some light on these details. While a whole bedrock of mathematics underpins these ideas, the goal of this post is to make it intuitive and easy to read. For just as paintings are not just to be appreciated by critics but you and me as well, mathematics must be appreciable to laymen and not just advanced mathematicians. Let us begin with a background to bring all readers up to speed with the vocabulary of basics needed to understand the post.</p>
+    <h2> Background of Computer Graphics (how to make things look realistic)</h2>
+		<p> The goal of computer graphics is to re-create the real world. Let us see the picture of the car below, and try to observe some of the details captured in this picture.
+    <img src="ford_mustang.jpg" width="80%">
 
-		<h2> Background </h2>
-		<p> Uncertaininty surrounds us everywhere. Trying to cross the road? Will the car stop and let you pass, or should you stop? Scheduling a football match? Will it rain on a particular day or not? Studying for an exam? What concepts will be tested on the exam, and which ones won't be? The car on the road, the weather on the day of the match, or how your professor decides to set an exam paper all are examples of processes whose outcome cannot be known for certain beforehand. Once they are done, the answer is known with complete certainity. Millions of such little processes pass by every single day in front of our eyes every single day. </p><br>
+    <h2> Background of Optics (how does light move) </h2>
 
-		<p> Yet, the outcomes of these processes seldom surprise us. For example, if a car is moving at a high speed, it's more probable that it won't stop and you should let it pass before crossing the road. Not all outcomes are equally liely, some are more "probable". Probability provides us with the tools to make sense of this uncertainity rigorously. When I say rigorous, I mean that we can assign a number to this relative likelihood of possible outcomes, we understand how and why this number is assigned, and most importantly, it provides us a language to communicate this number to others such that we all will agree on it.</p><br>
 
 
 		<p><b>Some definitions:-</b><br>
@@ -76,7 +77,7 @@
 		Probability of all outcomes: What is the probability that you'll get a head or a tail on a coin toss? It is 1, because one of the outcomes MUST happen. A probability of 1 means something is 100% probable, i.e. will happen for sure. Another example of this is Probability that a number from 1-6 will show up on a dice roll. So, probability of at least one of the outcomes happening is 1. Let us call this the sum-to-1 rule.
 
 		<h4> The special property </h4>
-		Non-overlapping outcomes: Outcomes that can't happen simultaneously. For example, in a dice roll the number on the top can't be both even and odd simultaneously. Whatever number you get will either be even or odd. How about outcome A: Number on top divisible by 2, and outcome B: Number on top divisible by 3? Outcome A and B are overlapping, because if 6 shows up on the dice, it will be divisible by both 2 and 3.  Non-overlapping outcomes are called "Mutually Exclusive" in mathematical terms, but I always found non-overlapping more intuitive. 
+		Non-overlapping outcomes: Outcomes that can't happen simultaneously. For example, in a dice roll the number on the top can't be both even and odd simultaneously. Whatever number you get will either be even or odd. How about outcome A: Number on top divisible by 2, and outcome B: Number on top divisible by 3? Outcome A and B are overlapping, because if 6 shows up on the dice, it will be divisible by both 2 and 3.  Non-overlapping outcomes are called "Mutually Exclusive" in mathematical terms, but I always found non-overlapping more intuitive.
 
 		<p>If you think about it, Heads/Tails, 1-6 on top of dice, even/odd on top of dice are all examples of non-overlapping outcomes. They show up very often, because they have a special property. This property is -<br><br>
 
@@ -113,7 +114,7 @@
 
 		We used the following things:-
 		1) We chose a list of possible outcomes which were non-overlapping. This gave us access to the special property axiom.
-		2) We were interested in one of them occuring, so we assumed it to be x. 
+		2) We were interested in one of them occuring, so we assumed it to be x.
 		3) Because the dice is symmetric, they were all equally likely to occur. So, each one the possible outcomes was x.
 		5) We asked, what is the probability of at least one of these occuring? According to Sum-to-1 rule, this must have been 1.
 		6) Using point 1 and 2 above, we got an expression for probability of at least these occuring in terms of x.
@@ -139,7 +140,7 @@
 		If you have an event which is true for K of these possible outcomes, P(E) = P(favourable outcome 1) + P(favourable outcome 2) + ... K times.
 		So, probability of the event = 1/N + 1/N ..... K times = K/N = Number of favourable events/ Number of total events.<br><br>
 
-		If you ever wondered what it feels like to invent mathematics, imagine thinking all of this through all by yourself, for the first time, with no blog or book to help you out. No wonder people like me and you are not mathematicians. No worries, we can still take a moment to appreciate the beauty of it, if not create it ourselves! 
+		If you ever wondered what it feels like to invent mathematics, imagine thinking all of this through all by yourself, for the first time, with no blog or book to help you out. No wonder people like me and you are not mathematicians. No worries, we can still take a moment to appreciate the beauty of it, if not create it ourselves!
 
 
 		<br><br>Hoping this post was helpful in building your intuition about probability, signing off, Spandan Madan!<br><br></p>
