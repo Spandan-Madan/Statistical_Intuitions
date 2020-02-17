@@ -2,6 +2,7 @@
 <html>
 <head>
     <title>Statistical Intuitions</title>
+    <script type="text/javascript" src="http://latex.codecogs.com/latexit.js"></script>
     <link href="style.css" rel="stylesheet" type="text/css" />
 </head>
 <body>
@@ -18,135 +19,50 @@
 
 		<p> As a part of a new move to read papers I wouldn't otherwise read, I am starting a new series called Sunday Classic Paper. Which is basically me forcing myself to read an interesting classic paper every week. This post covers the seminal paper in Computer Graphics - <a href="https://citeseerx.ist.psu.edu/viewdoc/download;?doi=10.1.1.63.1402&rep=rep1&type=pdf">"The Rendering Equation"</a>, by James Kajiya of Caltech, written in 1986.</p>
 
-    <h2> Background of Computer Graphics (how to make things look realistic)</h2>
-		<p> The goal of computer graphics is to re-create the real world. Let us see the picture of the car below, and try to observe some of the details captured in this picture.
-    <img src="ford_mustang.jpg" width="80%">
+    <h2> Section 1: Background/Context</h2>
 
-    <h2> Background of Optics (how does light move) </h2>
+    The paper we are dealing with today is from Computer Graphics and is at the heart of pretty much every media you consume - from animated movies by Disney, to all those CG scenes you see in movies like the Avengers. And my goal is to make it accessible to anyone who is willing to read it through - no prior experience in graphics or science needed.
 
+    <h4> Background of Computer Graphics (how to make things look realistic)</h4>
+		<p> The goal of computer graphics is to re-create the real world. Let us see the picture of the car below, and see how would the process of an animator/graphic designer re-creating it using computer graphics. While I could ask a designer for a picture of a "Ford mustang on a road, with water and trees in the background", surely, chances are very low they will be able to create exactly what's in this picture. So, how do we completely describe the contents of this scene? In layman terms, it seems natural to describe based on the objects in the scene, their colors, right? So, can we describe that car as a red mustang and call it a day? </p>
 
+    <img src="ford_mustang.jpg" width="100%">
 
-		<p><b>Some definitions:-</b><br>
-		Random Experiment: Any process for which the outcome is not know for certain. It is "random" in the sense that the outcome cannot be predicted beforehad. For example, will the car stop?</p><br>
+    <p> Not quite. For example, it is easy to tell from the shadow where the sun was when this photo was taken, wait a couple hours and while the car will still be the same, it will look very, very different in the picture taken - because the direction of sunlight falling on it would have changed. Needless to say, two different cameras or even two different photographers with the same camera would also capture a different picture even if everything (including time of day) was the same. That's because the cameras would have different lenses, which would capture a different version of the scene. Let's think about this a second - what does the camera even "capture"? The answer, as you might have guessed it, is that light passes through the camera's lens, and is captured by a sensor inside the camera which is sensitive to light. In fact, what had changed when the sun moved - Direction of the sun light. Why is there that shadow on the road - the car is blocking the sunlight from reaching that part of the road. Why is the color of the car bonnet yellower than the side of the car facing us - there's more sunlight on the bonnet and sunlight is yellow in color (it's technically white when it starts from the sun, yellow by the time it reaches us, but more on that later). Why are trees green in color - because it absorbs all other colors of light but reflects green out - so light reflected by it that reaches our eyes is green</p>
 
-		<p>Outcome: What happens when the random experiment (process is finished). For example, the car stopped for you to cross the road.</p><br>
+    <p>So, at the end of the day, all that is happening is movement of light. Light comes from a source (sun here), falls on objects which act on the light through different processes we have studied in high school physics, and the processed light reaches our eyes or a camera, which is what we call "seeing". So, if what makes a scene/picture real is how light is behaving in the scene, and we want to make things realistic in computer science ,it makes sense that we would have to mimic how light bedo we need to know all the physics in the world to do computer graphics? Do we actually model. Thus, in order to completely re-create that picturem we would need to completely simulate the object shapes/surfaces and their interactions with light falling on them. Seems complicated? Don't worry, section 3 below will walk you through it without any scary physics or mathematics. </p>
 
-		<p>Possile outcomes: What all could have happened. For example, 1) The car could have stopped, 2) The car could have not stopped. <br>
+    <h4> All the physics of light you need</h4>
 
-		For the cases we usually study (coin toss, dice roll etc), possible outcomes always seem to be the same. Heads/Tails, or the number 1-6 showing up on the top of the dice. But it is important to understand that the list of possible outcomes depends upon the question you care about. For example, let us consider a new problem: How many minutes before the deadline will you submit your next assignment? It sure is a random experiment, because we don't know it beforehand. But how do we list the possible outcomes? We could say it may be 1 minute, 2 minutes, 3 minutes and so on. OR we could go more fine grained and say it may be 10 seconds, 11 seconds, 12 seconds and so on. Both are perfectly valid list of possible outcomes and depending upon what we care about we can define a list of outcomes. We can be sure that the actual time of when you submit it will definitely be one of the possible outcomes.</p><br>
+    <p> The statement "the nature and movement of light is incredibly easy to understand" might be blasphemy for a physicist, and rightly so. Mellenia of philosophers/methematicians/physicists have spent years trying to unravel the mysteries of how light moves or interacts with matter, and the answer, in short, is pretty complicated. Let us just leave it at light is complicated. In fact it is so complicated, that in computer graphics we don't even try to model it accurately for the most part. Yet, we do make use of some very important principles physicists have discovered. I will go over these (in a somewhat meandering fashion):</p>
+    <img src="light_history.jpg" width = "100%">
 
-		<p>Event: Whether or not a particular subset of possible outcomes occured when the experiment finished. For example, getting an even number on top of a dice roll. It can be thought of as a combination of the outcomes getting 2,4 or 6 on top. When the experiment finishes, the event can either be True or False. If we get a 2, then the event "Even number on Top" is true. If we got 3, then the Event would have been False.
+    <p>The basic short history of light is that people have wondered about it since the ancient ages. Here's a fun <a href="https://photonterrace.net/en/photon/history/">timeline</a>. Light reflection was understood since 300 BCE. Euclid (a guy who's name pops up everywhere) gave us the laws of reflection that are still taught in every physics book in schools. In about 1600s, Snell gave us the famous laws of refraction (remember, different from reflection). More recently, scientific research, like it invariably does, posited far more complicated theories on light behaves. In the 17th century, Newton proposed that it was made of small particles called "corpuscles". Then, Huygens proposed that it was in fact a wave. This puzzled people, because the only waves they had seen were like ripples on water, or sound in air : "what is the medium in which light is moving though?", they asked. There were a bunch of theories around it, which have now been largely disproved (Google Ether if you're curious). And then, there were breakthroughs proving that light is in fact an ElectroMagnetic (EM) wave, which in fact does not need any medium to travel - it is composed of magnetic and electric fields which make each other move forward cyclically. Then came more complicated work proving that light indeed is neither particle nor wave, but has a dual nature. The famous double slit experiment (which all kids have at some point done in high school physics labs), proved this.</p>
 
-		<h2> Let the fun begin </h2>
+    We discussed above how we need to mimic light movement for realistic computer graphics. But it seems light isn't very easy to understand, let alone mimic (or simulate). What do we do? We do what engineers do best - we compomise. The aspects of light which are easy enough to run on a computer (reflection,refraction etc) are handled accurately in computer graphics. Einstein's and Young's theories of light were proposed because the simpler theories of reflection and refraction did not completely capture the behaviour of light. So, for the sake of computer graphics, we model these aspects of light behaviour using some intelligent approximations, and some nifty mathematics (as always). So, after all the scaring, essentially all the physics that you really really need to know for doing computer graphics are as follows:
 
-		<p>Simple question. You toss a coin, what's the probability of a Head showing up? We can all agree that it is 50% probable (or probability = 1/2) that a Heads shows up, and 50% probable that a Tails show up. If this was not the case, a coin toss would not be a fair way to decide things, which we know from experience it is.</p><br>
+    <ol>
+      <li> Sun Light (white light) is composed to components which can be described by wavelengths. There is a one to one correspondence between colors and wavelenths. So, light is composed of different colors (remember that a prism splits it into these colors.)
+      <li> Light moves in a straight line, and does not lose any of it's components or strength until it interacts with something. Ideally, some molecule, so air molecules too interact with light and cause it to behave differently, but let's simplify and neglect this behaviour for now. In general, interaction of light at molecular level is too hard too complicated for us. We will keep ourselves to understand its interactions with only surfaces instead.
+      <li> When light touches a surface, a few scary sounding things happen - they are either transmitted, reflected, absorbed, refracted, polarized, diffracted, or scattered (more <a href="https://science.nasa.gov/ems/03_behaviors">here</a> if interested).
+      <li> Reflection and Refraction have easy laws. We see them below in the list. Others are more hard to model - so we approximate them, especially scattering is a big important one.
+      <li> Law of reflection : Angle of incidence is equal to angle of reflection. Easiest understood with the figure below.
+        <center>
+          <img src="reflection.gif">
+        </center>
+      <li> Law of refraction: Different components of light bend different amounts as they pass through a medium. Best way to measure it is to see how the angle between the normal (line perpendicular to the surface) and the light ray changes. See figures below, basically, we can get the <span lang="latex">\theta_1, \theta_2</span> easily.
+      <li> Scattering is a particle level phenomenon. Think of it like this - as white sunlight leaves the sun and enters our atmosphere, particles of air absorb components of light and then throw them back out. This is called scattering. Whenever you read scattering think absorbing and throwing out in all directions. Thing is, different components get handled differently. The blueish compoenents get scattered much more, while the red and green components are scattered lesser. This is why the sky looks blue - because it is throwing out blue light, and why the sunlight appears yellow when it reaches us - because it has been stripped off the blue components due to scattering.
+      <li> We will approximate scattering, not mimic/simulate this molecular behaviour.
+    <h4> Background of rendering </h4>
 
-		<p> Back in high school, we all arrived at the answer of 1/2, and not from experience but based on the formula of probability. The formula we were taught was :- <br>
+    <p>This is the big one - so, how do we really do the above explained things in computer graphics. <i> What really, is the process?</i> Let us go over the steps one by one, adding some details as needed. If you would really like to take a few hours to understand this process, I strongly suggest reading this tutorial on <a href="https://www.scratchapixel.com/lessons/3d-basic-rendering/rendering-3d-scene-overview/computer-discrete-raster">scratcpixel</a>. But, I will go over the basics here for you, in very very short. We discussed earlier that we describe our scene by the 3D objects (car, tree etc) lying in our scene. We start with light from a source like a sun, follow light's movement as it interacts with thes objects, until it finally reaches our eye or the camera. So, naturally, the aspects we need to discuss are - how do we describe/handle 3D objects in a computer, then talk about how light moves and how this is simulated in a computer, how the light is captured by the camera, and how it is displyed on your screen.</p>
 
-		<p> Probability  = Number of favorable outcomes/ Number of total possible outcomes. </p><br>
-
-		<p> So, in this case, total outcomes = 2 (Heads, Tails) and favourable = 1 (Heads). So Probability of getting a Heads, or P(Heads) = 1/2.<br>
-
-		Great, let's look at another example. What is the probability of getting an even number if you roll a dice? Well, let's go back to our formula.</p><br>
-
-		<p> Total possible outcomes = 6, because it has to be one of 1,2,3,4,5 or 6.<br>
-		Favorable outcomes = 3, because if it is 2,4 or 6 then the number on top is even. <br><br>
-
-		So, P(even number on top) = 3/6 = 1/2.<br><br>
-
-		So far so good. Let's look at the last example described above now - How many minutes before the deadline will you submit the assignment. For simplicity of math, let's assume the assignment is due 7 days after it is released. Let's calculate the probability of you submitting it at the very last minute. <br><br>
-
-		Total possible outcomes = All possible minutes in 7 days = 10080.<br>
-		Favourale outcomes = 1, the last minute of the deadline.<br>
-		P(Assignment submitted at last minute) = 1/10080.<br>
-
-		Now, let's get the probability that you will submit it on the very first minute when it was released. That is, you solved and submitted the assigment in just 1 minute. <br><br>
-
-		Favourable outcomes = 1 again, the first minute after the assignment was released.<br>
-		P(Assignment submitted at first minute) = 1/10080.<br><br>
-
-		Well, that doesn't seem right. We know for a fact that most students will be submitting the assignment in the last minute. There's just no way an assignment could be solved in the first minute and submitted anyway. Then, how are the probabilities of these two outcomes equal? What went wrong. Is the formula wrong? Why does it work for dice and coins, but is absolutely useless for an actual problem in the real world?</p>
-
-		<h2> Assumptions are everything </h2>
-
-		The answer to the above conundrum is that the formula is not wrong. Well, at least not always. It works sometimes. For problems in high school math books it works perfectly, so let's try to understand why. There's 2 major assumptions that are needed to make the formula work. It didn't work in the above case because the assignment example doesn't follow one of these assumptions! But before we go any further, we need to go through some more background.
-
-		<h2> Background revisited </h2>
-
-		<h4> The Sum to 1 Rule </h4>
-		Probability of all outcomes: What is the probability that you'll get a head or a tail on a coin toss? It is 1, because one of the outcomes MUST happen. A probability of 1 means something is 100% probable, i.e. will happen for sure. Another example of this is Probability that a number from 1-6 will show up on a dice roll. So, probability of at least one of the outcomes happening is 1. Let us call this the sum-to-1 rule.
-
-		<h4> The special property </h4>
-		Non-overlapping outcomes: Outcomes that can't happen simultaneously. For example, in a dice roll the number on the top can't be both even and odd simultaneously. Whatever number you get will either be even or odd. How about outcome A: Number on top divisible by 2, and outcome B: Number on top divisible by 3? Outcome A and B are overlapping, because if 6 shows up on the dice, it will be divisible by both 2 and 3.  Non-overlapping outcomes are called "Mutually Exclusive" in mathematical terms, but I always found non-overlapping more intuitive.
-
-		<p>If you think about it, Heads/Tails, 1-6 on top of dice, even/odd on top of dice are all examples of non-overlapping outcomes. They show up very often, because they have a special property. This property is -<br><br>
-
-		P(Non-overlapping outcomes A or B happening) = P(outcome A) + P(outcome B)<br><br>
-
-		For example, P(even number on top) = P(2,4 or 6 on top) = P(2 on top) + P(4 on top) + P(6 on top)<br><br>
-
-		As shown above, each of these is 1/6, so the sum is 3/6. Which is also what we got from our formula for probability. Great, this property seems to be working. Does it work for non-overlapping outcomes?<br><br>
-
-		P(number on top divisbile by 2 or 3) = P(2,3, 4 or 6 on top) = 4/6. If we used the property, we'll get:-<br><br>
-
-		P(divisible by 2) + P(divisible by 3) = P(2,4 or 6 on top) + P(3 or 6 on top) = 3/6 + 2/6 = 5/6. Which is incorrect. And it's happening because we've doubly counted the overlapping part of these outcomes. (6 on top). So, this is a special property which works only for non-overlapping outcomes. That is, if we decided a list of possible outcomes (remember we pick it ourselves as mentioned before) such that they are non-overlapping, we can make use of this special property. <br><br></p>
-
-		<h2> From axioms to dice rolls </h2>
-
-		Let's consider the simple case of the Dice roll, where the formula was working fine.<br><br>
-
-		Let's say we were never given the formula to get the probability by counting the favourable and total outcomes. Instead, we are only given the Sum-to-1 Rule, and the Special Property. Well, your first question should be why is this a fair position to start with. And the answer is it's fair because the way mathematics works is that we start with some "Axioms", i.e. non-questionable assumptions which we say are True, and using them to infer useful properties which must be true if Axioms are true. These are called "Theorems". Axioms are extremely intuitive and often "obvious". Both the sum-to-1 rule and the special property of non-overlapping events are axioms. They are both obvious and intuitive. For example, the sum-to-1 rule says that at least one outcome must occur, which is obviously hard to argue with because if you throw a dice with 1-6 written on it, one of them must obviously show up.<br><br>
-
-		Starting from these axioms, let's get the probability of getting a 2 on the top. Since we don't know the probability of getting a 2 on top of the dice, let us just assume that it is x. <br><br>
-
-		Since getting any two numbers like 2 or 3 on top are non-overlapping, using the special property, probability of getting 1,2,3,4,5, or 6 = P(1) + P(2) + P(3) + P(4) + P(5) + P(6)<br><br>
-
-		Given the symmetric geometry of a cube, there's no reason to believe that getting a 1 on top one is more probable than getting another number like 2 on top i.e. they are all equally likely. So, probability of getting each of the numbers on top is = x.<br><br>
-
-		So, P(1,2,3,4,5 or 6) = P(1) + P(2) + P(3) + P(4) + P(5) + P(6) = x + x + x ... 6 times = 6x.<br><br>
-
-		Now, By sum-to-1 rule, the probability of getting at least one out of 1-6 should be 1.<br><br>
-
-
-		That is, 6x = 1, or x = 1/6.<br><br>
-
-		<h2> Why did this work? </h2>
-
-		We used the following things:-
-		1) We chose a list of possible outcomes which were non-overlapping. This gave us access to the special property axiom.
-		2) We were interested in one of them occuring, so we assumed it to be x.
-		3) Because the dice is symmetric, they were all equally likely to occur. So, each one the possible outcomes was x.
-		5) We asked, what is the probability of at least one of these occuring? According to Sum-to-1 rule, this must have been 1.
-		6) Using point 1 and 2 above, we got an expression for probability of at least these occuring in terms of x.
-		7) We equalled this expression to 1, to get the value of x.
-
-		<h2> What broke down for the example of assignment deadlines </h2>
-
-		Now, we are ready to understand why it didn't work for assignments, but worked for dice and coins. Stop reading this right here and try to guess which one the points in the list above does not hold true for time between assignments submission and deadline. If you think it's point 3, you're right. While the geometry of a coin and a dice ensures that all outcomes are equally likely, this is not true for assignments. The probability of you submitting your assignment in the last minute is NOT the same as you submitting it in the first minute after the assignment is released! Everything else works just fine! The outcomes are still non-overlapping. The 2 axioms still work (They always do). The symmetry is broken down, that's all.
-
-		<h2>The General formula</h2>
-
-		<p>IF AND ONLY IF you choose a list of possible outcomes that is non-overlapping, and all outcomes are equally likely. Let's assume that probability of one of these outcomes occuring is x, so automatically it is x for any of the possible outcomes. Let's say total possible outcomes is N. (So, N = 2 for coin tosses, 6 for dice rolls).<br><br>
-
-		P(At least one outcome occuring) = P(outcome 1 occuring) + P(outcome 2 occuring) + .... + P(outcome N occuring), using special property.
-		As each of them is x, P(At least one outcome occuring) = x + x + x + .... N times = N*x.<br><br>
-
-		By Sum-to-1 rule, P(At least one of them occuring) = 1.<br><br>
-		So, N*x = 1.
-
-		Thus, x = 1/N.<br><br>
-
-
-		If you have an event which is true for K of these possible outcomes, P(E) = P(favourable outcome 1) + P(favourable outcome 2) + ... K times.
-		So, probability of the event = 1/N + 1/N ..... K times = K/N = Number of favourable events/ Number of total events.<br><br>
-
-		If you ever wondered what it feels like to invent mathematics, imagine thinking all of this through all by yourself, for the first time, with no blog or book to help you out. No wonder people like me and you are not mathematicians. No worries, we can still take a moment to appreciate the beauty of it, if not create it ourselves!
-
-
-		<br><br>Hoping this post was helpful in building your intuition about probability, signing off, Spandan Madan!<br><br></p>
+    <h2> Section 2: The paper</h2>
+    That was a long background, which was important because the hope for this post is that anyone - from any walk of life be able to understand this seminal paper which is at the heart of pretty much most media consumed these days - they all have some aspect of CG these days, after all.
+		<br><br>Hoping this post will help you really appreciate how computer graphics really works, in this era of disney+ subscriptions. Next time you watch an animation - you might be hard pressed to not wonder about the beauty of light bouncing around the scene. For all the science in this post, it is important to remember that a big chunk of graphics is to do with art, not science. I recommend this talk about how <a href="https://www.youtube.com/watch?v=Z1R1z9ipFnM"> artists and programmers came together to create the eyes of robot Wall-E</a>. Hope you had fun reading this! <br><br></p>
     </div>
     <div id="footer">
-        Please feel free to write to me at smadan@mit.edu
+        For suggestions and comments, please feel free to write to me at spandan_madan@g.harvard.edu
     </div>
 </div>
 
