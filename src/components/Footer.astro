@@ -1,0 +1,103 @@
+---
+// Footer component
+---
+
+<style>
+  .footer-nav-link {
+    position: relative;
+    display: inline-block;
+    transition: all 0.3s ease;
+    will-change: text-shadow;
+  }
+
+  .footer-nav-link::after {
+    content: '';
+    position: absolute;
+    bottom: -0.25rem;
+    left: 0;
+    width: 0;
+    height: 0.125rem;
+    background-color: #2c2827;
+    transition: width 0.3s ease;
+  }
+
+  .footer-nav-link:hover::after {
+    width: 100%;
+  }
+
+  .footer-nav-link:hover {
+    -webkit-text-stroke: 0.03125rem currentColor;
+    text-stroke: 0.03125rem currentColor;
+  }
+</style>
+
+<footer id="footer-contact" class="bg-bg-secondary flex items-start justify-center pb-[7.5rem] pt-0 px-[2.25rem] md:px-[3.5rem] lg:px-[7rem] lg:h-[50rem]">
+  <div class="flex flex-col lg:flex-row items-start justify-between pt-[2.5rem] md:pt-[5rem] lg:pt-[7.5rem] w-full max-w-[120rem] h-full">
+    <!-- Left Content -->
+    <div class="flex flex-col gap-[3.5rem] w-full lg:w-[31.25rem]">
+      <!-- Logo and Tagline -->
+      <div class="flex flex-col gap-[2rem]">
+        <a href="/" class="block text-h2 font-dm-sans font-bold text-text-heading w-full max-w-[15.625rem] md:max-w-[25rem] lg:max-w-[30rem]">
+          Statistical Intuitions
+        </a>
+        <p class="text-body-lg font-dm-sans text-text-heading leading-none m-0">
+          Musings on Machine Learning, AI and Neuroscience from a scientist turned entrepreneur.
+        </p>
+      </div>
+
+      <!-- Contact -->
+      <div class="flex flex-col gap-[1.5rem] items-start w-full">
+        <div class="flex flex-col gap-[0.5rem] items-start">
+          <p class="text-body-lg font-dm-sans font-bold text-text-heading">
+            Get in touch
+          </p>
+          <p class="text-body-md font-dm-sans text-black">
+            Suggest topics, report issues, or just say hi.
+          </p>
+        </div>
+        <a href="mailto:spandan@engramme.com" class="flex items-center gap-2 border-b border-[#8f8a88] py-[0.125rem] text-body-md font-dm-sans text-text-body-light hover:text-black transition-colors">
+          spandan@engramme.com
+          <svg width="9" height="10" viewBox="0 0 9 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M1 9L8 1M8 1H1M8 1V9" stroke="#8f8a88" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </a>
+      </div>
+    </div>
+
+    <!-- Right Navigation -->
+    <div class="flex flex-col gap-[2.5rem] mt-[5rem] lg:mt-0 w-full lg:w-[20.25rem]">
+      <nav class="flex flex-col gap-[2.5rem] md:gap-[2.5rem] lg:gap-[2.5rem] text-h3 font-dm-sans font-semibold text-black items-start">
+        <a href="/" class="footer-nav-link whitespace-nowrap">
+          HOME
+        </a>
+        <a href="/#articles" class="footer-nav-link whitespace-nowrap">
+          ARTICLES
+        </a>
+        <a href="/bio" class="footer-nav-link whitespace-nowrap">
+          ABOUT
+        </a>
+        <a href="#footer-contact" class="footer-nav-link whitespace-nowrap">
+          CONTACT
+        </a>
+      </nav>
+
+      <!-- Social Links -->
+      <div class="flex flex-col gap-[0.625rem] border-t border-[#d2d0d0] pt-[1.25rem]">
+        <nav class="flex gap-[1.5rem] items-center">
+          <a href="mailto:spandan@engramme.com" class="text-body-sm font-dm-sans text-text-body-light hover:text-text-heading transition-colors">
+            Email
+          </a>
+          <a href="https://github.com/spandan-madan" target="_blank" rel="noopener noreferrer" class="text-body-sm font-dm-sans text-text-body-light hover:text-text-heading transition-colors">
+            GitHub
+          </a>
+          <a href="https://scholar.google.com/citations?user=QY5OAIMAAAAJ&hl=en&oi=ao" target="_blank" rel="noopener noreferrer" class="text-body-sm font-dm-sans text-text-body-light hover:text-text-heading transition-colors">
+            Scholar
+          </a>
+          <a href="https://twitter.com/spanmad" target="_blank" rel="noopener noreferrer" class="text-body-sm font-dm-sans text-text-body-light hover:text-text-heading transition-colors">
+            Twitter
+          </a>
+        </nav>
+      </div>
+    </div>
+  </div>
+</footer>

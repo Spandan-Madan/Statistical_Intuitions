@@ -1,0 +1,214 @@
+---
+import HoverUnderline from "./HoverUnderline.astro";
+
+const currentPath = Astro.url.pathname;
+const isHomeActive = currentPath === "/";
+const isBioActive = currentPath.startsWith("/bio");
+---
+
+<style>
+  .navbar-container {
+    position: sticky;
+    top: 0;
+    transition: transform 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease, backdrop-filter 0.3s ease;
+  }
+
+  .navbar-hidden {
+    transform: translateY(-100%);
+  }
+
+  .navbar-scrolled {
+    background-color: rgba(250, 250, 245, 0.3);
+    backdrop-filter: blur(5px);
+  }
+</style>
+
+<!-- Mobile Navigation (< md) -->
+<div id="mobile-navbar" class="navbar-container md:hidden relative z-40 flex w-full items-center justify-between px-[36px] pt-[28px] pb-[20px] mx-auto bg-surface-page max-w-[1920px]">
+  <!-- Logo -->
+  <div class="flex items-center justify-center">
+    <a href="/" class="font-dm-sans font-bold text-text-heading text-[18px] leading-[26px] tracking-[-0.02em] hover:opacity-80 transition-opacity">
+      SI
+    </a>
+  </div>
+
+  <!-- Hamburger Menu Button -->
+  <div class="flex items-center gap-[12px]">
+    <button id="mobile-menu-button" class="p-[12px] rounded-[32px] hover:bg-black/5 transition-colors" aria-label="Menu">
+      <svg id="hamburger-icon" class="w-[24px] h-[24px]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M3 12H21M3 6H21M3 18H21" stroke="#423d3b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <svg id="close-icon" class="w-[24px] h-[24px] hidden" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18 6L6 18M6 6L18 18" stroke="#423d3b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<!-- Mobile Menu Dropdown (hidden by default) -->
+<div id="mobile-menu" class="hidden md:hidden fixed inset-0 z-30 bg-surface-page">
+  <!-- Header with Logo and Close Button -->
+  <div class="flex items-center justify-between px-[36px] pt-[28px] pb-[20px]">
+    <a href="/" class="font-dm-sans font-bold text-text-heading text-[18px] leading-[26px] tracking-[-0.02em] hover:opacity-80 transition-opacity">
+      SI
+    </a>
+    <button id="mobile-menu-close" class="p-[12px] hover:bg-black/5 transition-colors rounded-[32px]" aria-label="Close menu">
+      <svg class="w-[24px] h-[24px]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18 6L6 18M6 6L18 18" stroke="#423d3b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Navigation Links -->
+  <div class="flex flex-col px-[36px]">
+    <a href="/" class="flex items-center justify-between py-[24px] border-b border-border-default hover:bg-black/5 transition-colors">
+      <span class="text-body-md font-dm-sans text-text-heading uppercase tracking-[-0.08px]">
+        HOME
+      </span>
+      <svg class="w-[24px] h-[24px]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" class="text-text-heading" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </a>
+
+    <a href="/#articles" class="flex items-center justify-between py-[24px] border-b border-border-default hover:bg-black/5 transition-colors">
+      <span class="text-body-md font-dm-sans text-text-heading uppercase tracking-[-0.08px]">
+        ARTICLES
+      </span>
+      <svg class="w-[24px] h-[24px]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" class="text-text-heading" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </a>
+
+    <a href="/bio" class="flex items-center justify-between py-[24px] border-b border-border-default hover:bg-black/5 transition-colors">
+      <span class="text-body-md font-dm-sans text-text-heading uppercase tracking-[-0.08px]">
+        ABOUT
+      </span>
+      <svg class="w-[24px] h-[24px]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" class="text-text-heading" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </a>
+
+    <a href="#footer-contact" class="flex items-center justify-between py-[24px] border-b border-border-default hover:bg-black/5 transition-colors">
+      <span class="text-body-md font-dm-sans text-text-heading uppercase tracking-[-0.08px]">
+        CONTACT
+      </span>
+      <svg class="w-[24px] h-[24px]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" class="text-text-heading" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </a>
+  </div>
+</div>
+
+<!-- Desktop Navigation (>= md) -->
+<nav id="desktop-navbar" class="navbar-container hidden md:flex relative z-40 w-full items-center justify-between px-[60px] py-[20px] mx-auto bg-surface-page max-w-[1920px]">
+  <!-- Logo -->
+  <div class="flex items-center">
+    <a href="/" class="flex items-center font-dm-sans font-bold text-text-heading text-[18px] leading-[26px] tracking-[-0.02em] hover:opacity-80 transition-opacity">
+      SI
+    </a>
+  </div>
+
+  <!-- Navigation Links -->
+  <div class="flex items-center gap-[19px] text-[16px] leading-[26px] tracking-[-0.08px] font-dm-sans font-normal text-[#2c3831]">
+    <HoverUnderline tag="a" href="/" class={`whitespace-nowrap ${isHomeActive ? 'active' : ''}`}>
+      HOME
+    </HoverUnderline>
+    <HoverUnderline tag="a" href="/#articles" class="whitespace-nowrap">
+      ARTICLES
+    </HoverUnderline>
+    <HoverUnderline tag="a" href="/bio" class={`whitespace-nowrap ${isBioActive ? 'active' : ''}`}>
+      ABOUT
+    </HoverUnderline>
+    <HoverUnderline tag="a" href="#footer-contact" class="whitespace-nowrap">
+      CONTACT
+    </HoverUnderline>
+  </div>
+</nav>
+
+<script>
+  const menuButton = document.getElementById('mobile-menu-button');
+  const mobileMenu = document.getElementById('mobile-menu');
+  const menuCloseButton = document.getElementById('mobile-menu-close');
+  const hamburgerIcon = document.getElementById('hamburger-icon');
+  const closeIcon = document.getElementById('close-icon');
+
+  function openMenu() {
+    mobileMenu?.classList.remove('hidden');
+    hamburgerIcon?.classList.add('hidden');
+    closeIcon?.classList.remove('hidden');
+  }
+
+  function closeMenu() {
+    mobileMenu?.classList.add('hidden');
+    hamburgerIcon?.classList.remove('hidden');
+    closeIcon?.classList.add('hidden');
+  }
+
+  if (menuButton && mobileMenu && hamburgerIcon && closeIcon) {
+    menuButton.addEventListener('click', () => {
+      if (mobileMenu.classList.contains('hidden')) {
+        openMenu();
+      } else {
+        closeMenu();
+      }
+    });
+
+    if (menuCloseButton) {
+      menuCloseButton.addEventListener('click', closeMenu);
+    }
+
+    document.addEventListener('click', (event) => {
+      const target = event.target as HTMLElement;
+      if (!menuButton.contains(target) && !mobileMenu.contains(target)) {
+        closeMenu();
+      }
+    });
+  }
+
+  // Navbar scroll effect
+  const mobileNavbar = document.getElementById('mobile-navbar');
+  const desktopNavbar = document.getElementById('desktop-navbar');
+
+  let lastScrollY = window.scrollY;
+  let ticking = false;
+
+  function handleScroll() {
+    const currentScrollY = window.scrollY;
+    const scrollThreshold = 50;
+    const scrolled = currentScrollY > scrollThreshold;
+    const scrollingDown = currentScrollY > lastScrollY;
+    const scrollingUp = currentScrollY < lastScrollY;
+
+    [mobileNavbar, desktopNavbar].forEach(navbar => {
+      if (!navbar) return;
+
+      if (scrolled) {
+        navbar.classList.add('navbar-scrolled');
+      } else {
+        navbar.classList.remove('navbar-scrolled');
+      }
+
+      if (scrollingDown && currentScrollY > 100) {
+        navbar.classList.add('navbar-hidden');
+      } else if (scrollingUp || currentScrollY <= 100) {
+        navbar.classList.remove('navbar-hidden');
+      }
+    });
+
+    lastScrollY = currentScrollY;
+    ticking = false;
+  }
+
+  function onScroll() {
+    if (!ticking) {
+      window.requestAnimationFrame(() => {
+        handleScroll();
+        ticking = false;
+      });
+      ticking = true;
+    }
+  }
+
+  window.addEventListener('scroll', onScroll);
+  handleScroll();
+</script>

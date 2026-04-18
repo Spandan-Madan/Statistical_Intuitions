@@ -1,0 +1,64 @@
+---
+interface Props {
+  tag?: 'a' | 'button' | 'span';
+  href?: string;
+  target?: string;
+  rel?: string;
+  class?: string;
+  [x: string]: any;
+}
+
+const {
+  tag: Tag = 'a',
+  href,
+  target,
+  rel,
+  class: className,
+  ...rest
+} = Astro.props;
+---
+
+<Tag
+  href={Tag === 'a' ? href : undefined}
+  target={Tag === 'a' ? target : undefined}
+  rel={Tag === 'a' ? rel : undefined}
+  class:list={["hover-underline", className]}
+  {...rest}
+>
+  <slot />
+</Tag>
+
+<style is:global>
+  .hover-underline {
+    position: relative;
+    display: inline-block;
+    transition: all 0.3s ease;
+  }
+
+  .hover-underline::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 0;
+    width: 0;
+    height: 1px;
+    background-color: currentColor;
+    transition: width 0.3s ease;
+  }
+
+  .hover-underline:hover::after {
+    width: 100%;
+  }
+
+  .hover-underline.active::after {
+    width: 100%;
+  }
+
+  .hover-underline:hover {
+    text-shadow: 0.5px 0 0 currentColor;
+  }
+
+  .hover-underline.active {
+    text-shadow: 0.5px 0 0 currentColor;
+  }
+</style>

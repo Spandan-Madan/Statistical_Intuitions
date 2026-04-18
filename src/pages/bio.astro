@@ -1,0 +1,37 @@
+---
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout title="Bio">
+  <!-- Page Heading -->
+  <section class="flex flex-col gap-[28px] items-center px-[36px] md:px-[80px] lg:px-[120px] pt-[90px] md:pt-[150px] lg:pt-[150px] pb-[80px] md:pb-[80px] lg:pb-[80px] bg-surface-page">
+    <h1 class="text-h1 text-text-heading text-center font-dm-sans font-bold max-w-[356px] md:max-w-[722px] lg:max-w-[814px] scroll-animate" data-delay="200">
+      About
+    </h1>
+  </section>
+
+  <!-- Profile Section -->
+  <section class="flex flex-col gap-[48px] items-start px-[36px] md:px-[56px] lg:px-[112px] py-[40px] md:py-[80px] bg-surface-page">
+    <div class="flex flex-col md:flex-row gap-[24px] md:gap-[36px] items-center w-full h-auto md:h-[350px] group rounded-[12px] overflow-hidden">
+      <div class="w-full md:w-[441px] h-[300px] md:h-full shrink-0 rounded-[12px] overflow-hidden bg-gray-200 relative">
+        <img src="/assets/batur.jpg" alt="Spandan Madan" class="w-full h-full object-cover absolute inset-0" />
+      </div>
+      <div class="flex flex-col gap-[24px] items-start flex-1">
+        <div class="flex flex-col gap-[11px] items-start w-full">
+          <p class="text-h5 font-dm-sans font-medium text-text-heading">
+            Spandan Madan
+          </p>
+          <p class="text-body-lg font-dm-sans text-text-body">
+            Co-Founder & CTO, Engramme
+          </p>
+        </div>
+        <div class="text-body-md font-dm-sans text-text-body leading-[26px]">
+          <a href="https://www.linkedin.com/in/spandan-madan-337b6820b/" target="_blank" rel="noopener noreferrer" class="underline text-text-heading hover:opacity-70">LinkedIn</a> · <a href="https://github.com/spandan-madan" target="_blank" rel="noopener noreferrer" class="underline text-text-heading hover:opacity-70">GitHub</a> · <a href="https://scholar.google.com/citations?user=QY5OAIMAAAAJ&hl=en" target="_blank" rel="noopener noreferrer" class="underline text-text-heading hover:opacity-70">Google Scholar</a>
+          <br><br>
+          Spandan is an interdisciplinary AI and Neuroscience researcher who earned his PhD at Harvard University and MIT CSAIL. He is a Siebel Scholar, Winson Chen Scholar, Snap Scholar, and has developed algorithms that have been commercially deployed across Google DeepMind, Meta, Adobe, and Fujitsu. In the past, he was a researcher at Microsoft Research, and completed his undergraduate from IIT Delhi, India.
+        </div>
+      </div>
+    </div>
+  </section>
+
+</Layout>

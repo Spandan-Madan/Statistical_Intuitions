@@ -1,0 +1,58 @@
+---
+import Layout from "./Layout.astro";
+
+export interface Props {
+  title: string;
+  subtitle?: string;
+  date?: string;
+}
+
+const { title, subtitle, date } = Astro.props;
+---
+
+<Layout title={title}>
+  <article class="px-[2.25rem] md:px-[3.5rem] lg:px-[7rem] max-w-[1920px] mx-auto">
+    <!-- Article Header -->
+    <header class="pt-12 md:pt-20 lg:pt-[7.5rem] pb-8 md:pb-12 max-w-[780px] mx-auto scroll-animate" data-delay="0">
+      <a
+        href="/"
+        class="inline-flex items-center gap-2 text-body-md text-text-body-light no-underline hover:text-text-heading transition-colors mb-8"
+      >
+        &larr; Back to all articles
+      </a>
+      <h1 class="text-h1 font-dm-sans font-bold text-text-heading mb-4">
+        {title}
+      </h1>
+      {subtitle && (
+        <p class="text-h5 font-dm-sans font-medium text-text-body-light mb-4">
+          {subtitle}
+        </p>
+      )}
+      {date && (
+        <p class="text-body-sm text-text-body-light font-dm-sans">
+          {date}
+        </p>
+      )}
+    </header>
+
+    <!-- Article Content -->
+    <div class="max-w-[780px] mx-auto pb-16 md:pb-24 lg:pb-[7.5rem]">
+      <div class="prose prose-lg max-w-none
+        prose-headings:font-dm-sans prose-headings:text-text-heading prose-headings:font-bold
+        prose-h2:text-h4 prose-h2:mt-12 prose-h2:mb-4 prose-h2:pb-3 prose-h2:border-b prose-h2:border-border-light
+        prose-h3:text-h5 prose-h3:mt-8 prose-h3:mb-3
+        prose-h4:text-h6 prose-h4:mt-6 prose-h4:mb-2
+        prose-p:text-body-lg prose-p:text-text-body prose-p:font-dm-sans prose-p:leading-relaxed prose-p:mb-4
+        prose-a:text-text-heading prose-a:underline prose-a:decoration-border-default hover:prose-a:decoration-text-heading prose-a:transition-colors
+        prose-strong:text-text-heading prose-strong:font-semibold
+        prose-ul:text-body-lg prose-ul:text-text-body
+        prose-ol:text-body-lg prose-ol:text-text-body
+        prose-li:text-text-body prose-li:mb-1
+        prose-img:rounded-[12px] prose-img:my-8
+        prose-blockquote:border-l-border-default prose-blockquote:text-text-body-light
+      ">
+        <slot />
+      </div>
+    </div>
+  </article>
+</Layout>

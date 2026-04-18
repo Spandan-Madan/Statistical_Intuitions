@@ -1,0 +1,270 @@
+---
+import BlogPost from "../../layouts/BlogPost.astro";
+---
+
+<BlogPost title="The Memory Architecture of Claude Code" subtitle="A deep dive into how Claude Code remembers you across sessions" date="April 2026">
+  <h2>Introduction</h2>
+
+  <p>Since the rise of frontier AI labs like OpenAI, Anthropic, and Google DeepMind, progress in AI systems has largely taken place behind closed doors, with little visibility into their underlying implementations. That changed last week, when the source code for Claude Code leaked&mdash;offering a rare glimpse into how Anthropic's flagship product handles memory.</p>
+
+  <p>Large language models are inherently stateless. Every session begins from scratch: you re-explain your project, restate your preferences, and reestablish context&mdash;only to repeat the process the next day. This limitation is well known, and a wide range of solutions has emerged, from retrieval-augmented generation (RAG) with vector databases to more advanced approaches like Graph RAG and file-based search systems.</p>
+
+  <p>Claude Code takes a different approach. It relies on a file-based memory system combined with extensive prompt engineering. This post presents a deep dive into that system, reverse-engineered from the leaked source code. At its core, the design is surprisingly simple: memories are stored as short (~150-character) text entries written to disk. The responsibility for reading and writing these memories is delegated to the language model itself.</p>
+
+  <p>The system boils down to five core paths: three for reading memories and two for writing them. All paths operate on a shared storage of markdown files on disk.</p>
+
+  <h2>The Architecture at a Glance</h2>
+
+  <p><em>Click any node to jump to its section.</em></p>
+
+  <div class="not-prose w-full">
+    <div class="mermaid">
+      flowchart TB
+        MEM["&lt;b&gt;Memory Directory&lt;/b&gt;\n.md files with frontmatter + MEMORY.md index"]
+
+        MEM --&gt; R1
+        MEM --&gt; R2
+        MEM --&gt; R3
+
+        subgraph Read ["Read Paths"]
+            direction LR
+            R1["&lt;b&gt;1. Chat Start&lt;/b&gt;\nMEMORY.md → user context"]
+            R2["&lt;b&gt;2. Per-Message Prefetch&lt;/b&gt;\nSonnet selects up to 5 files"]
+            R3["&lt;b&gt;3. Tool Call Read Path&lt;/b&gt;\nModel calls Read tool"]
+        end
+
+        R1 --&gt; Agent
+        R2 --&gt; Agent
+        R3 --&gt; Agent
+
+        Agent["Main Agent"]
+
+        Agent --&gt; W1
+        Agent --&gt; W2
+
+        subgraph Write ["Write Paths"]
+            direction LR
+            W1["&lt;b&gt;1. Background Extraction&lt;/b&gt;\nSubagent after final response"]
+            W2["&lt;b&gt;2. Model Writes Directly&lt;/b&gt;\nWrite/Edit during reasoning"]
+        end
+
+        click MEM "#memory-directory"
+        click R1 "#read-path-1"
+        click R2 "#read-path-2"
+        click R3 "#read-path-3"
+        click W1 "#write-path-1"
+        click W2 "#write-path-2"
+    </div>
+  </div>
+
+  <h2 id="memory-directory">The Memory Directory</h2>
+
+  <p>All memories live in a single directory on disk: <code>~/.claude/projects/&lt;project-slug&gt;/memory/</code> in simple markdown files.</p>
+
+  <p>Each memory file has YAML frontmatter with three fields: a <code>name</code>, a one-line <code>description</code>, and a <code>type</code>. The description is important &mdash; it is what the system reads when deciding which memories are relevant to a given message, without reading the full file. This decision is made by an LLM call to Sonnet, more on that later.</p>
+
+  <p>There are four memory types:</p>
+
+  <div class="not-prose grid grid-cols-1 md:grid-cols-2 gap-[16px] my-6">
+    <div class="group relative border border-[#d2d0d0] rounded-[12px] p-[20px] hover:border-[#4a9ae8] hover:shadow-md transition-all cursor-default">
+      <p class="font-bold text-text-heading mb-[6px] font-dm-sans">user</p>
+      <p class="text-body-sm text-text-body-light font-dm-sans">Who you are, your role, your expertise, your preferences.</p>
+      <div class="absolute left-0 right-0 top-full mt-[4px] z-10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-white border border-[#4a9ae8] rounded-[12px] p-[16px] shadow-lg text-body-sm font-dm-sans">
+        <p class="italic">"I've been writing Go for ten years but this is my first time touching the React side of this repo"</p>
+        <p class="mt-[8px] text-text-body-light">&rarr; saves: deep Go expertise, new to React &mdash; frame frontend explanations in terms of backend analogues</p>
+      </div>
+    </div>
+    <div class="group relative border border-[#d2d0d0] rounded-[12px] p-[20px] hover:border-[#4a9ae8] hover:shadow-md transition-all cursor-default">
+      <p class="font-bold text-text-heading mb-[6px] font-dm-sans">feedback</p>
+      <p class="text-body-sm text-text-body-light font-dm-sans">Guidance you've given about how to work. Both corrections and confirmations.</p>
+      <div class="absolute left-0 right-0 top-full mt-[4px] z-10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-white border border-[#4a9ae8] rounded-[12px] p-[16px] shadow-lg text-body-sm font-dm-sans">
+        <p class="italic">"Don't mock the database in these tests &mdash; we got burned last quarter when mocked tests passed but the prod migration failed"</p>
+        <p class="mt-[8px] text-text-body-light">&rarr; saves: integration tests must hit a real database, not mocks</p>
+      </div>
+    </div>
+    <div class="group relative border border-[#d2d0d0] rounded-[12px] p-[20px] hover:border-[#4a9ae8] hover:shadow-md transition-all cursor-default">
+      <p class="font-bold text-text-heading mb-[6px] font-dm-sans">project</p>
+      <p class="text-body-sm text-text-body-light font-dm-sans">Context about ongoing work not in code or git history. Deadlines, motivations.</p>
+      <div class="absolute left-0 right-0 top-full mt-[4px] z-10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-white border border-[#4a9ae8] rounded-[12px] p-[16px] shadow-lg text-body-sm font-dm-sans">
+        <p class="italic">"We're freezing all non-critical merges after Thursday &mdash; mobile team is cutting a release branch"</p>
+        <p class="mt-[8px] text-text-body-light">&rarr; saves: merge freeze begins 2026-03-05 for mobile release cut</p>
+      </div>
+    </div>
+    <div class="group relative border border-[#d2d0d0] rounded-[12px] p-[20px] hover:border-[#4a9ae8] hover:shadow-md transition-all cursor-default">
+      <p class="font-bold text-text-heading mb-[6px] font-dm-sans">reference</p>
+      <p class="text-body-sm text-text-body-light font-dm-sans">Pointers to external systems and where to find information.</p>
+      <div class="absolute left-0 right-0 top-full mt-[4px] z-10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-white border border-[#4a9ae8] rounded-[12px] p-[16px] shadow-lg text-body-sm font-dm-sans">
+        <p class="italic">"Check the Linear project INGEST if you want context on these tickets"</p>
+        <p class="mt-[8px] text-text-body-light">&rarr; saves: pipeline bugs are tracked in Linear project "INGEST"</p>
+      </div>
+    </div>
+  </div>
+
+  <p>Alongside the individual memory files sits <code>MEMORY.md</code> &mdash; an index file. Each line is a pointer: a title, a link to the file, and a one-line hook. Think of it as a table of contents. It is always loaded at the start of every conversation, truncated to 200 lines or 25KB, whichever comes first.</p>
+
+  <p>Notably absent from the memory types: code patterns, architecture, file paths, git history, debugging recipes. The system explicitly excludes anything derivable from the current state of the codebase. Memory is reserved for what the code can't tell you.</p>
+
+  <h2 id="read-path-1">Read Path 1: Chat Start</h2>
+
+  <p>When a new conversation begins, two things happen.</p>
+
+  <p>First, what Anthropic calls <strong>behavioral instructions</strong>. These instructions are loaded into the system prompt.</p>
+
+  <details class="not-prose my-6 border border-[#d2d0d0] rounded-[12px] overflow-hidden">
+    <summary class="cursor-pointer px-[20px] py-[14px] font-bold font-dm-sans text-text-heading bg-bg-secondary hover:bg-[#eef5ff] transition-colors">
+      Full main agent read instructions
+    </summary>
+    <div class="px-[20px] py-[16px] text-body-sm font-dm-sans text-text-body bg-white flex flex-col gap-[12px]">
+      <p><strong>When to access memories:</strong></p>
+      <ul class="list-disc pl-6 flex flex-col gap-[6px]">
+        <li>When memories seem relevant, or the user references prior-conversation work.</li>
+        <li>You MUST access memory when the user explicitly asks you to check, recall, or remember.</li>
+        <li>If the user says to ignore or not use memory: proceed as if MEMORY.md were empty.</li>
+      </ul>
+      <p>Memory records can become stale over time. Before answering based solely on memory, verify that the memory is still correct by reading the current state of the files or resources. If a recalled memory conflicts with current information, trust what you observe now &mdash; and update or remove the stale memory.</p>
+      <p>A memory that names a specific function, file, or flag is a claim that it existed <em>when the memory was written</em>. It may have been renamed, removed, or never merged. Before recommending it: if the memory names a file path, check the file exists. If the memory names a function or flag, grep for it.</p>
+      <p>"The memory says X exists" is not the same as "X exists now."</p>
+    </div>
+  </details>
+
+  <p>These are hardcoded &mdash; the types of memory, the save and recall rules, the type definitions. These instructions are cached and don't change between turns.</p>
+
+  <p>Second, <strong>MEMORY.md</strong> is loaded into the user context. Not the system prompt &mdash; the user context. This gives the model the full index of what memories exist, so it knows what it can look up. If the index exceeds 200 lines or 25KB, it is hard-chopped &mdash; no summarization, no prioritization, just the first 200 lines with a warning appended.</p>
+
+  <p>This is the always-on baseline. Every conversation starts with the model knowing the rules and having the table of contents.</p>
+
+  <h2 id="read-path-2">Read Path 2: Per-Message Prefetch</h2>
+
+  <p>Every time you send a message, a simple pre-fetch call is made to Sonnet with the prompt: "Which of these are relevant? Pick up to 5.". This runs <strong>concurrently</strong> with the main API call. More details on this:</p>
+
+  <ol>
+    <li>Your message text is extracted. Single-word messages are skipped.</li>
+    <li><code>scanMemoryFiles()</code> reads the <strong>frontmatter only</strong> of every <code>.md</code> file in the memory directory. Not the file contents &mdash; just the name, description, and type.</li>
+    <li>Those headers, along with your message, are sent to <strong>Sonnet</strong> via a side query. The prompt is simple: "Which of these are relevant? Pick up to 5."</li>
+    <li>The full contents of the selected files are read from disk.</li>
+    <li>Anything already in context &mdash; from prior turns or earlier tool calls &mdash; is filtered out.</li>
+    <li>The survivors are injected into your message as <code>&lt;system-reminder&gt;</code> tags.</li>
+  </ol>
+
+  <p>A few constraints keep this from flooding the context. There is a per-session byte budget &mdash; once cumulative injected bytes exceed a cap, surfacing stops. Files surfaced in prior turns are not surfaced again. Recently-used tools are also passed to the selector so it doesn't surface docs for tools already working fine. And the cap is 5 files per turn, chosen by a smaller, faster model (Sonnet) that only sees frontmatter.</p>
+
+  <p>The <code>&lt;system-reminder&gt;</code> mechanism: these are XML tags wrapping text that get inserted into <strong>user messages</strong>, not the system prompt. The model is trained to treat content inside these tags as system-level context even though it arrives in a user turn. This lets the system inject context mid-conversation without modifying the system prompt on every turn.</p>
+
+  <h2 id="read-path-3">Read Path 3: Tool Call Read Path</h2>
+
+  <p>The simplest path. There is no special "memory read" tool. It is the regular Read tool &mdash; the same one used to read any file in the codebase. The model decides on its own to read a memory file, the same way it decides to read any source file.</p>
+
+  <p>The only memory-specific behavior: IF the file that is read is in the memory directory, the prompt passed to the model contains the file contents + text indicating when the file was created. For eg, "this memory was saved 3 days ago" would be prepended to the file content. No special routing, no special tool.</p>
+
+  <p>When does this path fire? When the model decides it should. The behavioral instructions in the system prompt tell it when to consider reading memories ("when memories seem relevant", "when the user explicitly asks you to recall"), but enforcement is purely prompt-based. The runtime doesn't orchestrate it &mdash; it is the model choosing its own sequence of tool calls.</p>
+
+  <h4>3 read paths, 2 write paths, 1 directory of markdown files.</h4>
+
+  <h2 id="write-path-1">Write Path 1: Background Extraction</h2>
+
+  <p>After the model produces its final text response &mdash; when it is done reasoning and has no more tool calls &mdash; the extraction mechanism fires.</p>
+
+  <p>A background copy of the conversation is forked. A subagent receives the messages since the last extraction (the prompt says "the most recent ~10 messages," but the runtime scopes it to messages since the last extraction ran) and a manifest of all existing memory files (frontmatter only, so it knows what already exists). It is sandboxed: it can read code files, but it can only write to the memory directory.</p>
+
+  <p>The subagent is instructed to be efficient &mdash; read all files it might update on turn 1, write all changes on turn 2. No interleaving, no investigation. It applies the same type taxonomy and the same exclusion rules as the main agent.</p>
+
+  <details class="not-prose my-6 border border-[#d2d0d0] rounded-[12px] overflow-hidden">
+    <summary class="cursor-pointer px-[20px] py-[14px] font-bold font-dm-sans text-text-heading bg-bg-secondary hover:bg-[#eef5ff] transition-colors">
+      Full extraction subagent prompt
+    </summary>
+    <div class="px-[20px] py-[16px] text-body-sm font-dm-sans text-text-body bg-white flex flex-col gap-[12px]">
+      <p>You are now acting as the memory extraction subagent. Analyze the most recent ~10 messages above and use them to update your persistent memory systems.</p>
+      <p>Available tools: Read, Grep, Glob, read-only Bash (ls/find/cat/stat/wc/head/tail and similar), and Edit/Write for paths inside the memory directory only. Bash rm is not permitted. All other tools &mdash; MCP, Agent, write-capable Bash, etc &mdash; will be denied.</p>
+      <p>You have a limited turn budget. Edit requires a prior Read of the same file, so the efficient strategy is: turn 1 &mdash; issue all Read calls in parallel for every file you might update; turn 2 &mdash; issue all Write/Edit calls in parallel. Do not interleave reads and writes across multiple turns.</p>
+      <p>You MUST only use content from the last ~10 messages to update your persistent memories. Do not waste any turns attempting to investigate or verify that content further &mdash; no grepping source files, no reading code to confirm a pattern exists, no git commands.</p>
+    </div>
+  </details>
+
+  <p>Several conditions gate whether extraction runs at all:</p>
+
+  <ul>
+    <li>If the main agent already wrote memory files during this turn, extraction is skipped &mdash; no need to double-write.</li>
+    <li>Sub-agents don't trigger extraction, only the main agent does.</li>
+    <li>Extraction is skipped in remote mode.</li>
+    <li>A turn counter throttles frequency (default: every turn, but configurable).</li>
+    <li>If one extraction is already running when another turn ends, it queues a single trailing run rather than stacking up.</li>
+  </ul>
+
+  <h2 id="write-path-2">Write Path 2: Model Writes Directly</h2>
+
+  <p>The model can also write memories during its normal reasoning, by calling the Write or Edit tool on a file in the memory directory. Same as any other file write &mdash; no special mechanism.</p>
+
+  <p>The behavioral instructions in the system prompt tell the model the two-step save process: first, write the memory file with proper frontmatter; second, add a pointer to <code>MEMORY.md</code>. The model decides on its own when to do this &mdash; typically when the user explicitly asks it to remember something, or when it encounters information that matches the save criteria for one of the four memory types.</p>
+
+  <details class="not-prose my-6 border border-[#d2d0d0] rounded-[12px] overflow-hidden">
+    <summary class="cursor-pointer px-[20px] py-[14px] font-bold font-dm-sans text-text-heading bg-bg-secondary hover:bg-[#eef5ff] transition-colors">
+      Full main agent write instructions
+    </summary>
+    <div class="px-[20px] py-[16px] text-body-sm font-dm-sans text-text-body bg-white flex flex-col gap-[12px]">
+      <p>You have a persistent, file-based memory system at <code class="bg-bg-secondary px-1 rounded">~/.claude/projects/&lt;slug&gt;/memory/</code>. This directory already exists &mdash; write to it directly with the Write tool (do not run mkdir or check for its existence).</p>
+      <p>You should build up this memory system over time so that future conversations can have a complete picture of who the user is, how they'd like to collaborate with you, what behaviors to avoid or repeat, and the context behind the work the user gives you.</p>
+      <p>If the user explicitly asks you to remember something, save it immediately as whichever type fits best. If they ask you to forget something, find and remove the relevant entry.</p>
+      <p class="font-bold mt-[8px]">How to save memories</p>
+      <p>Saving a memory is a two-step process:</p>
+      <p><strong>Step 1</strong> &mdash; write the memory to its own file (e.g., <code class="bg-bg-secondary px-1 rounded">user_role.md</code>, <code class="bg-bg-secondary px-1 rounded">feedback_testing.md</code>) using YAML frontmatter with name, description, and type fields.</p>
+      <p><strong>Step 2</strong> &mdash; add a pointer to that file in <code class="bg-bg-secondary px-1 rounded">MEMORY.md</code>. <code class="bg-bg-secondary px-1 rounded">MEMORY.md</code> is an index, not a memory &mdash; each entry should be one line, under ~150 characters.</p>
+    </div>
+  </details>
+
+  <h2>Summary</h2>
+
+  <p>The overall design philosophy is clear: memories are short text summaries that are stored in a MEMORY.md, and the model is given read/write to access and create these memories. These markdown files on disk come with YAML frontmatter for metadata, and you can open the memory directory and read exactly what the model knows about you. Retrieval follows a 2-step approach to save on cost. The cheap path (frontmatter scan + Sonnet classification) runs on every message. The expensive path (full file reads) only happens for the 5 files that pass the filter.</p>
+
+  <h2>What's Missing</h2>
+
+  <p>As a model of memory, Claude Code's approach is closer to a filing cabinet than the human brain. Comparing it to how human memory actually works, the following fundamental gaps emerge.</p>
+
+  <h4>Reactive, not Pro-active</h4>
+
+  <p>Claude's memory only activates when you send a message &mdash; nothing surfaces on its own. Human memory is spontaneous. Memories come to mind without us searching, triggered by our ambience: who we're with, where we are, what we're doing. The Sonnet prefetch sees your message text and nothing else &mdash; there is no ambient context, no sense of location, time of day, company, activity, or mood. Claude has no ambience.</p>
+
+  <h4>200 lines, Not lifelong</h4>
+
+  <p>The MEMORY.md index truncates at 200 lines. Individual memory files are short texts. This works for project-level preferences, but not for a lifetime of personal memories &mdash; petabytes of interactions, photos, conversations, experiences. The architecture has a hard ceiling. And there is no learning from use &mdash; a memory saved six months ago has the same standing as one saved yesterday. There is no strengthening through recall, no decay, no adaptation based on whether surfaced memories were actually useful.</p>
+
+  <h4>Retrieval is keyword based (semantic), not associative</h4>
+
+  <p>Sonnet matches frontmatter descriptions against your message &mdash; essentially semantic text search. For a memory to make it to Claude, your prompt must contain the exact words mentioned in the memory. In sharp contrast, human memory is associative: one memory triggers another, forming chains of recall across multiple hops. Claude's retrieval is flat. There is no chaining, no "this reminds me of that."</p>
+
+  <p>Claude Code's memory system is a pragmatic engineering solution to a real limitation &mdash; Large Language Models are stateless, and were not designed to model human memory. As such, it addresses the immediate need. However, the architecture does not attempt to capture the three properties that cognitive science identifies as fundamental to human memory &mdash; <strong>proactive</strong> recall, <strong>lifelong</strong> retention, and <strong>associative</strong> retrieval. Bridging this gap between information storage and true memory remains an open and important problem.</p>
+
+  <script is:inline src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <script is:inline>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      securityLevel: 'loose',
+      themeVariables: {
+        primaryColor: '#f4f3f3',
+        primaryTextColor: '#151211',
+        primaryBorderColor: '#8f8a88',
+        lineColor: '#787270',
+        secondaryColor: '#f4f3f3',
+        tertiaryColor: '#ffffff',
+        fontFamily: 'DM Sans, sans-serif',
+        fontSize: '14px',
+        clusterBkg: '#eef5ff',
+        clusterBorder: '#4a9ae8',
+        nodeTextColor: '#151211'
+      }
+    });
+
+    document.addEventListener('click', function(e) {
+      var link = e.target.closest('a[href^="#"]');
+      if (!link) return;
+      var href = link.getAttribute('href');
+      if (!href || href.length < 2) return;
+      var target = document.getElementById(href.slice(1));
+      if (!target) return;
+      e.preventDefault();
+      var rect = target.getBoundingClientRect();
+      var offset = window.scrollY + rect.top - 80;
+      window.scrollTo({ top: offset, behavior: 'smooth' });
+    });
+  </script>
+</BlogPost>

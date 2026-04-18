@@ -1,0 +1,88 @@
+---
+import Layout from "../layouts/Layout.astro";
+
+const articles = [
+  {
+    title: "The Memory Architecture of Claude Code",
+    excerpt: "A deep dive into how Claude Code remembers you across sessions — reverse-engineered from the leaked source code. 3 read paths, 2 write paths, 1 directory of markdown files.",
+    href: "/posts/claude-memory",
+    date: "April 2026",
+  },
+  {
+    title: "The physics behind world models",
+    excerpt: "Part of the \"Sunday Classic Paper\" series. Covering the seminal 1986 paper by James Kajiya that sits at the heart of computer graphics.",
+    href: "/posts/the-rendering-equation",
+    date: "June 2023",
+  },
+  {
+    title: "Probability and its origins",
+    excerpt: "We are given a formulaic definition of probability without an intuition for why it is true. The goal of this post is to shed some light on these details.",
+    href: "/posts/intuition-of-probability",
+    date: "April 2022",
+  },
+  {
+    title: "An End to End Machine Learning Pipeline",
+    excerpt: "A complete hands-on tutorial covering data scraping, feature engineering, conventional ML models, and deep neural networks for multi-modal movie genre classification.",
+    href: "/posts/deep-learning-project",
+    date: "July 2020",
+  },
+];
+---
+
+<Layout title="Home">
+  <!-- Hero Section -->
+  <section class="relative bg-white h-screen flex flex-col items-center justify-center px-6 md:px-16 lg:px-[112px] py-0 max-w-[1920px] mx-auto w-full">
+    <div class="flex flex-col items-center gap-6 md:gap-12 w-full max-w-[1288px]">
+      <div class="flex flex-col items-center gap-2 w-full scroll-animate" data-delay="200">
+        <h1 class="text-[clamp(2.25rem,7vw,5.5rem)] leading-[1] font-dm-sans font-medium text-[#151211] text-center tracking-[-0.02em]">
+          Statistical Intuitions
+        </h1>
+      </div>
+      <p class="text-[clamp(1rem,1.5vw,1.375rem)] leading-[1.4] font-dm-sans font-normal text-text-body-light text-center w-full max-w-[600px] scroll-animate" data-delay="600">
+        Musings on Machine Learning, AI and Neuroscience from a scientist turned entrepreneur.
+      </p>
+    </div>
+    <a href="#articles" class="absolute bottom-12 right-8 md:right-16 lg:right-[112px] flex items-center gap-2 text-body-md font-dm-sans text-text-body-light hover:text-text-heading transition-colors scroll-animate" data-delay="900">
+      Continue to articles
+      <svg class="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 5V19M12 19L5 12M12 19L19 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </a>
+  </section>
+
+  <!-- Articles Section -->
+  <section id="articles" class="flex flex-col gap-[24px] px-[36px] md:px-[56px] lg:px-[120px] xl:px-[160px] 2xl:px-[200px] pb-[80px] md:pb-[120px] lg:pb-[160px] pt-16 md:pt-24 lg:pt-[7.5rem]">
+    <h2 class="text-h2 font-dm-sans font-bold text-text-heading mb-6 md:mb-10 scroll-animate" data-delay="0">
+      Articles
+    </h2>
+
+    <div class="flex flex-col">
+      {articles.map((article, i) => (
+        <a
+          href={article.href}
+          class="group flex flex-col lg:flex-row gap-[24px] py-[32px] md:py-[40px] border-b border-[#d2d0d0] hover:border-black transition-colors first:border-t no-underline cursor-pointer scroll-animate"
+          data-delay={String(i * 150)}
+        >
+          <div class="flex-1 flex flex-col gap-[12px] max-w-[700px]">
+            <div class="flex items-center gap-[12px]">
+              <span class="text-body-md font-dm-sans font-semibold text-text-body-light">
+                {article.date}
+              </span>
+            </div>
+            <h3 class="text-h6 font-dm-sans font-medium text-text-heading">
+              {article.title}
+            </h3>
+            <p class="text-body-md font-dm-sans text-text-body">
+              {article.excerpt}
+            </p>
+          </div>
+          <div class="flex items-center lg:ml-auto">
+            <svg class="w-[20px] h-[20px] text-text-body-light group-hover:text-text-heading transition-colors" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </a>
+      ))}
+    </div>
+  </section>
+</Layout>

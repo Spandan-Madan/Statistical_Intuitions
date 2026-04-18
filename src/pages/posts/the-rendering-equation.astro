@@ -1,0 +1,102 @@
+---
+import BlogPost from "../../layouts/BlogPost.astro";
+---
+
+<BlogPost title="The physics behind world models" subtitle="From the Rendering Equation to AI World Models" date="June 2023">
+  <p>This post starts with the seminal paper in Computer Graphics - <a href="https://dl.acm.org/doi/10.1145/15886.15902">"The Rendering Equation"</a> by James Kajiya [1], written in 1986, and traces a line from the physics of light all the way to modern AI world models. The rendering equation is at the heart of pretty much every media you consume - from animated movies by Disney, to all those CG scenes you see in movies like the Avengers. But it is also, as we will see, one of the earliest examples of a <em>world model</em> in computer science - and understanding it gives us a powerful lens for thinking about today's AI systems that try to learn the physics of the world from data. My goal is to make all of this accessible to anyone willing to read it through - no prior experience in graphics, physics, or AI needed.</p>
+
+  <h4>Background of Computer Graphics (how to make things look realistic)</h4>
+
+  <p>The goal of computer graphics is to re-create the real world. Let us see the picture of the car below, and see how would the process of an animator/graphic designer re-creating it using computer graphics. While I could ask a designer for a picture of a "Ford mustang on a road, with water and trees in the background", surely, chances are very low they will be able to create exactly what's in this picture. So, how do we completely describe the contents of this scene? In layman terms, it seems natural to describe based on the objects in the scene, their colors, right? So, can we describe that car as a red mustang and call it a day?</p>
+
+  <img src="/assets/ford_mustang.jpg" alt="Ford Mustang on a road with water and trees" class="w-full rounded-xl my-8" />
+
+  <p>Not quite. For example, it is easy to tell from the shadow where the sun was when this photo was taken, wait a couple hours and while the car will still be the same, it will look very, very different in the picture taken - because the direction of sunlight falling on it would have changed. Needless to say, two different cameras or even two different photographers with the same camera would also capture a different picture even if everything (including time of day) was the same. That's because the cameras would have different lenses, which would capture a different version of the scene. Let's think about this a second - what does the camera even "capture"? The answer, as you might have guessed it, is that light passes through the camera's lens, and is captured by a sensor inside the camera which is sensitive to light. In fact, what had changed when the sun moved - Direction of the sun light. Why is there that shadow on the road - the car is blocking the sunlight from reaching that part of the road. Why is the color of the car bonnet yellower than the side of the car facing us - there's more sunlight on the bonnet and sunlight is yellow in color (it's technically white when it starts from the sun, yellow by the time it reaches us, but more on that later). Why are trees green in color - because it absorbs all other colors of light but reflects green out - so light reflected by it that reaches our eyes is green.</p>
+
+  <p>So, at the end of the day, all that is happening is movement of light. Light comes from a source (sun here), falls on objects which act on the light through different processes we have studied in high school physics, and the processed light reaches our eyes or a camera, which is what we call "seeing". So, if what makes a scene/picture real is how light is behaving in the scene, and we want to make things realistic in computer science, it makes sense that we would have to mimic how light behaves. Thus, in order to completely re-create that picture we would need to completely simulate the object shapes/surfaces and their interactions with light falling on them. Seems complicated? Don't worry, the sections below will walk you through it without any scary physics or mathematics.</p>
+
+  <h4>All the physics of light you need</h4>
+
+  <p>The statement "the nature and movement of light is incredibly easy to understand" might be blasphemy for a physicist, and rightly so. Millennia of philosophers/mathematicians/physicists have spent years trying to unravel the mysteries of how light moves or interacts with matter, and the answer, in short, is pretty complicated. Let us just leave it at light is complicated. In fact it is so complicated, that in computer graphics we don't even try to model it accurately for the most part. Yet, we do make use of some very important principles physicists have discovered. I will go over these (in a somewhat meandering fashion):</p>
+
+  <img src="/assets/light_history.jpg" alt="History of light" class="w-full rounded-xl my-8" />
+
+  <p>The basic short history of light is that people have wondered about it since the ancient ages. Here's a fun <a href="https://photonterrace.net/en/photon/history/">timeline</a>. Light reflection was understood since 300 BCE. Euclid (a guy who's name pops up everywhere) gave us the laws of reflection that are still taught in every physics book in schools. In about 1600s, Snell gave us the famous laws of refraction (remember, different from reflection). More recently, scientific research, like it invariably does, posited far more complicated theories on light behaves. In the 17th century, Newton proposed in his <em>Opticks</em> [13] that light was made of small particles called "corpuscles". Then, Huygens proposed in his <em>Treatise on Light</em> [12] that it was in fact a wave. This puzzled people, because the only waves they had seen were like ripples on water, or sound in air: "what is the medium in which light is moving though?", they asked. There were a bunch of theories around it, which have now been largely disproved (Google Ether if you're curious). And then, Maxwell [14] proved that light is in fact an ElectroMagnetic (EM) wave, which does not need any medium to travel - it is composed of magnetic and electric fields which make each other move forward cyclically. Then came more complicated work proving that light indeed is neither particle nor wave, but has a dual nature. The famous double slit experiment (which all kids have at some point done in high school physics labs), proved this.</p>
+
+  <p>We discussed above how we need to mimic light movement for realistic computer graphics. But it seems light isn't very easy to understand, let alone mimic (or simulate). What do we do? We do what engineers do best - we compromise. The aspects of light which are easy enough to run on a computer (reflection, refraction etc) are handled accurately in computer graphics. Early illumination models like Phong shading [3] and the Cook-Torrance reflectance model [4] gave us practical ways to approximate how surfaces interact with light. Einstein's and Young's theories of light were proposed because the simpler theories of reflection and refraction did not completely capture the behaviour of light. So, for the sake of computer graphics, we model these aspects of light behaviour using some intelligent approximations, and some nifty mathematics (as always). So, after all the scaring, essentially all the physics that you really really need to know for doing computer graphics are as follows:</p>
+
+  <ol>
+    <li>Sun Light (white light) is composed of components which can be described by wavelengths. There is a one to one correspondence between colors and wavelengths. So, light is composed of different colors (remember that a prism splits it into these colors.)</li>
+    <li>Light moves in a straight line, and does not lose any of its components or strength until it interacts with something. Ideally, some molecule, so air molecules too interact with light and cause it to behave differently, but let's simplify and neglect this behaviour for now. In general, interaction of light at molecular level is too hard and complicated for us. We will keep ourselves to understand its interactions with only surfaces instead.</li>
+    <li>When light touches a surface, a few scary sounding things happen - they are either transmitted, reflected, absorbed, refracted, polarized, diffracted, or scattered (more <a href="https://science.nasa.gov/ems/03_behaviors">here</a> if interested).</li>
+    <li>Reflection and Refraction have easy laws. We see them below in the list. Others are more hard to model - so we approximate them, especially scattering is a big important one.</li>
+    <li>Law of reflection: Angle of incidence is equal to angle of reflection. Easiest understood with the figure below.
+      <img src="/assets/reflection.gif" alt="Reflection diagram" class="block mx-auto my-6 rounded-xl" />
+    </li>
+    <li>Law of refraction: Different components of light bend different amounts as they pass through a medium. Best way to measure it is to see how the angle between the normal (line perpendicular to the surface) and the light ray changes.</li>
+    <li>Scattering is a particle level phenomenon. Think of it like this - as white sunlight leaves the sun and enters our atmosphere, particles of air absorb components of light and then throw them back out. This is called scattering. Whenever you read scattering think absorbing and throwing out in all directions. Thing is, different components get handled differently. The blueish components get scattered much more, while the red and green components are scattered lesser. This is why the sky looks blue - because it is throwing out blue light, and why the sunlight appears yellow when it reaches us - because it has been stripped off the blue components due to scattering.</li>
+    <li>We will approximate scattering, not mimic/simulate this molecular behaviour.</li>
+  </ol>
+
+  <h4>Background of rendering</h4>
+
+  <p>This is the big one - so, how do we really do the above explained things in computer graphics. <em>What really, is the process?</em> Let us go over the steps one by one, adding some details as needed. If you would really like to take a few hours to understand this process, I strongly suggest reading this tutorial on <a href="https://www.scratchapixel.com/lessons/3d-basic-rendering/rendering-3d-scene-overview/computer-discrete-raster">scratchpixel</a>. But, I will go over the basics here for you, in very very short. We discussed earlier that we describe our scene by the 3D objects (car, tree etc) lying in our scene. We start with light from a source like a sun, follow light's movement as it interacts with these objects, until it finally reaches our eye or the camera. A landmark technique for doing this is ray tracing, introduced by Whitted [2], where we trace rays of light backwards from the camera into the scene. Kajiya's rendering equation [1] then unified all of these light interactions into a single elegant integral equation. So, naturally, the aspects we need to discuss are - how do we describe/handle 3D objects in a computer, then talk about how light moves and how this is simulated in a computer, how the light is captured by the camera, and how it is displayed on your screen.</p>
+
+  <h2>From the Rendering Equation to AI World Models</h2>
+
+  <p>So far, we have discussed how computer graphics works by explicitly simulating the physics of light - reflection, refraction, scattering, and so on. The rendering equation [1] is essentially a mathematical description of how the world works, at least as far as light is concerned. In other words, it is a <em>world model</em> - a compact set of rules that, when executed, can generate realistic depictions of the world. And this is precisely why the title of this post is "the physics behind world models" - because the rendering equation is one of the earliest and most elegant examples of a world model in computer science.</p>
+
+  <p>However, the rendering equation is a <em>hand-crafted</em> world model. Physicists and mathematicians spent centuries figuring out the rules of light, and Kajiya distilled them into a single equation. What if, instead of hand-crafting these rules, we could <em>learn</em> them from data? This idea was formalized by Ha and Schmidhuber [8], who showed that neural networks could learn compressed spatial and temporal representations of environments - what they called "World Models".</p>
+
+  <p>This is exactly what modern AI world models attempt to do. Models like OpenAI's Sora [11], Google's Genie [10], and a slew of video prediction models are trained on massive amounts of video data and, in the process, appear to learn an implicit understanding of physics. OpenAI's technical report on Sora [11] is titled "Video Generation Models as World Simulators" - making the connection to world models explicit. They can generate videos where objects fall with gravity, light reflects off surfaces, and shadows move consistently - without ever being told the laws of physics. They have learned their own internal "rendering equation" of sorts, except it is encoded in billions of neural network parameters rather than in a clean mathematical formula.</p>
+
+  <h4>What makes something a world model?</h4>
+
+  <p>At its core, a world model is any system that can predict what happens next given the current state of the world. The rendering equation [1] does this for light - given a scene description (objects, materials, light sources), it predicts what color each pixel should be. Modern AI world models do something broader - given a sequence of video frames (and sometimes actions), they predict what comes next. LeCun [9] lays out a vision for how such world models could form the backbone of autonomous machine intelligence, arguing that learning predictive models of the world is a prerequisite for general-purpose AI.</p>
+
+  <p>The key difference is in how the physics is represented. In the rendering equation, the physics is <em>explicit</em> - we can point to specific terms in the equation and say "this term handles reflection" or "this term handles incoming light from other surfaces." In neural world models, the physics is <em>implicit</em> - the model has learned something about how the world works, but it is entangled across millions of parameters in ways we cannot easily interpret.</p>
+
+  <p>This distinction matters enormously. Explicit world models like the rendering equation generalize perfectly - they work just as well for scenes they have never encountered before, because the laws of physics don't change. Implicit world models, on the other hand, can struggle with out-of-distribution scenarios. You might have noticed that AI-generated videos sometimes show physically impossible things - objects that pass through each other, shadows that don't quite match the lighting, or reflections that are just slightly off. These are exactly the kinds of errors you would <em>never</em> get with the rendering equation, because the physics is baked in correctly.</p>
+
+  <h4>Why this matters</h4>
+
+  <p>Understanding the explicit physics behind rendering gives us a powerful lens for evaluating AI world models. When we see a video generation model produce a realistic reflection, we can appreciate that it has somehow learned the law of reflection (angle of incidence equals angle of reflection) from data alone. When we see it fail at caustics (those beautiful light patterns you see at the bottom of a swimming pool), we understand that it has not yet captured the complexity of refraction and light transport that the rendering equation handles.</p>
+
+  <p>There is also a growing line of research that tries to combine the best of both approaches - using the structure of physics-based rendering as an inductive bias for neural networks, or using neural networks to accelerate parts of the rendering pipeline that are too slow to simulate exactly. Neural Radiance Fields (NeRFs) [5] showed that a neural network can learn to represent a 3D scene and synthesize novel views by implicitly learning volumetric rendering. More recently, 3D Gaussian Splatting [7] achieved real-time radiance field rendering by representing scenes as collections of 3D Gaussians. Tewari et al. [6] provide an excellent survey of this rapidly evolving field of neural rendering. These hybrid approaches are some of the most exciting areas in modern graphics and AI research.</p>
+
+  <p>So the rendering equation is not just a piece of history - it is a conceptual foundation for understanding what AI world models are trying to achieve, and a benchmark for what they still get wrong.</p>
+
+  <p>Hoping this post will help you really appreciate how computer graphics really works, in this era of Disney+ subscriptions. Next time you watch an animation - you might be hard pressed to not wonder about the beauty of light bouncing around the scene. And perhaps, next time you see an AI-generated video, you might wonder just how much physics it has really learned. For all the science in this post, it is important to remember that a big chunk of graphics is to do with art, not science. I recommend this talk about how <a href="https://www.youtube.com/watch?v=Z1R1z9ipFnM">artists and programmers came together to create the eyes of robot Wall-E</a>. Hope you had fun reading this!</p>
+
+  <h2>References</h2>
+
+  <h4>Rendering and Computer Graphics</h4>
+  <ol>
+    <li>[1] Kajiya, J. T. (1986). <a href="https://dl.acm.org/doi/10.1145/15886.15902">The Rendering Equation</a>. <em>SIGGRAPH '86</em>, 143-150.</li>
+    <li>[2] Whitted, T. (1980). <a href="https://dl.acm.org/doi/10.1145/358876.358882">An Improved Illumination Model for Shaded Display</a>. <em>Communications of the ACM</em>, 23(6), 343-349.</li>
+    <li>[3] Phong, B. T. (1975). <a href="https://dl.acm.org/doi/10.1145/360825.360839">Illumination for Computer Generated Pictures</a>. <em>Communications of the ACM</em>, 18(6), 311-317.</li>
+    <li>[4] Cook, R. L., & Torrance, K. E. (1982). <a href="https://dl.acm.org/doi/10.1145/357290.357293">A Reflectance Model for Computer Graphics</a>. <em>ACM Transactions on Graphics</em>, 1(1), 7-24.</li>
+  </ol>
+
+  <h4>Neural Rendering (Bridging Graphics and AI)</h4>
+  <ol>
+    <li>[5] Mildenhall, B., Srinivasan, P. P., Tancik, M., Barron, J. T., Ramamoorthi, R., & Ng, R. (2020). <a href="https://arxiv.org/abs/2003.08934">NeRF: Representing Scenes as Neural Radiance Fields for View Synthesis</a>. <em>ECCV 2020</em>.</li>
+    <li>[6] Tewari, A., et al. (2020). <a href="https://arxiv.org/abs/2004.03805">State of the Art on Neural Rendering</a>. <em>Computer Graphics Forum</em>, 39(2), 701-727.</li>
+    <li>[7] Kerbl, B., Kopanas, G., Leimkühler, T., & Drettakis, G. (2023). <a href="https://arxiv.org/abs/2308.04079">3D Gaussian Splatting for Real-Time Radiance Field Rendering</a>. <em>ACM Transactions on Graphics</em>, 42(4).</li>
+  </ol>
+
+  <h4>AI World Models</h4>
+  <ol>
+    <li>[8] Ha, D., & Schmidhuber, J. (2018). <a href="https://arxiv.org/abs/1803.10122">World Models</a>. <em>arXiv preprint arXiv:1803.10122</em>.</li>
+    <li>[9] LeCun, Y. (2022). <a href="https://openreview.net/forum?id=BZ5a1r-kVsf">A Path Towards Autonomous Machine Intelligence</a>. <em>OpenReview</em>.</li>
+    <li>[10] Bruce, J., et al. (2024). <a href="https://arxiv.org/abs/2402.15391">Genie: Generative Interactive Environments</a>. <em>arXiv preprint arXiv:2402.15391</em>.</li>
+    <li>[11] OpenAI. (2024). <a href="https://openai.com/index/video-generation-models-as-world-simulators/">Video Generation Models as World Simulators</a>. <em>OpenAI Technical Report (Sora)</em>.</li>
+  </ol>
+
+  <h4>Physics of Light</h4>
+  <ol>
+    <li>[12] Huygens, C. (1690). <em>Traité de la Lumière (Treatise on Light)</em>.</li>
+    <li>[13] Newton, I. (1704). <em>Opticks: or, A Treatise of the Reflexions, Refractions, Inflexions and Colours of Light</em>.</li>
+    <li>[14] Maxwell, J. C. (1865). <a href="https://royalsocietypublishing.org/doi/10.1098/rstl.1865.0008">A Dynamical Theory of the Electromagnetic Field</a>. <em>Philosophical Transactions of the Royal Society of London</em>, 155, 459-512.</li>
+  </ol>
+</BlogPost>
