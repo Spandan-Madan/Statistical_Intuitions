@@ -1,0 +1,449 @@
+---
+import BlogPost from "../../layouts/BlogPost.astro";
+---
+
+<BlogPost title="The Tool Architecture of Claude Code" subtitle="A deep dive into how Claude Code discovers, dispatches, and executes tools" date="April 2026">
+  <h2>Introduction</h2>
+
+  <p>In a <a href="/posts/claude-memory">previous post</a>, we reverse-engineered Claude Code's memory system from its leaked source code. Memory turned out to be surprisingly simple &mdash; markdown files, frontmatter, and prompt engineering. The tool system is the opposite. It is the most engineered subsystem in the entire codebase: 43+ tools, a streaming execution pipeline, a layered permission system, a hook framework, and a concurrency scheduler &mdash; all wired together to turn a stateless language model into something that can read files, run shell commands, search the web, and spawn sub-agents.</p>
+
+  <p>This post walks through the entire tool lifecycle, from how a tool is defined, to how the model's tool calls are dispatched, to how results flow back into the conversation. The system boils down to four layers: a <strong>tool interface</strong> that every tool implements, a <strong>registry</strong> that assembles the tool pool, a <strong>dispatch pipeline</strong> that validates, permissions-checks, and executes each call, and a <strong>concurrency scheduler</strong> that decides what runs in parallel.</p>
+
+  <h2>The Architecture at a Glance</h2>
+
+  <p><em>Click any node to jump to its section.</em></p>
+
+  <div class="not-prose w-full">
+    <div class="mermaid">
+      flowchart TB
+        DEF["<b>Tool Interface</b>\nbuildTool() + Zod schema"]
+
+        DEF --> REG
+
+        subgraph Registry ["Tool Registry"]
+            direction LR
+            REG["<b>getAllBaseTools()</b>\n43+ tools, feature-gated"]
+            MCP["<b>MCP Tools</b>\nDynamic from servers"]
+        end
+
+        REG --> POOL
+        MCP --> POOL
+
+        POOL["<b>assembleToolPool()</b>\nDeduplicate, sort, merge"]
+
+        POOL --> API
+        POOL --> DISPATCH
+
+        API["<b>toolToAPISchema()</b>\nZod → JSON Schema for API"]
+
+        subgraph Dispatch ["Dispatch Pipeline"]
+            direction TB
+            D1["<b>1. Extract tool_use blocks</b>\nFrom API response"]
+            D2["<b>2. Validate input</b>\nZod safeParse"]
+            D3["<b>3. Pre-tool hooks</b>\nCan modify, block, decide"]
+            D4["<b>4. Permission check</b>\nRules + modes + hooks"]
+            D5["<b>5. tool.call()</b>\nActual execution"]
+            D6["<b>6. Post-tool hooks</b>\nCan modify output"]
+            D7["<b>7. Result mapping</b>\nToolResult → API format"]
+            D1 --> D2 --> D3 --> D4 --> D5 --> D6 --> D7
+        end
+
+        subgraph Scheduler ["Concurrency Scheduler"]
+            direction LR
+            S1["<b>Read-only tools</b>\nRun in parallel (up to 10)"]
+            S2["<b>Write tools</b>\nRun serially"]
+        end
+
+        DISPATCH --> Scheduler
+
+        click DEF "#tool-interface"
+        click REG "#tool-registry"
+        click MCP "#mcp-tools"
+        click POOL "#tool-pool-assembly"
+        click API "#api-serialization"
+        click D1 "#extraction"
+        click D2 "#input-validation"
+        click D3 "#pre-tool-hooks"
+        click D4 "#permission-check"
+        click D5 "#tool-execution"
+        click D6 "#post-tool-hooks"
+        click D7 "#result-mapping"
+        click S1 "#concurrency"
+        click S2 "#concurrency"
+    </div>
+  </div>
+
+  <h2 id="tool-interface">The Tool Interface</h2>
+
+  <p>Every tool in Claude Code implements the same interface, defined in <code>Tool.ts</code>. The type is generic over three parameters: <code>Input</code> (a Zod schema), <code>Output</code> (the result type), and <code>P</code> (progress data). In practice, a tool is an object with about 30 methods, but only a handful matter for understanding the system.</p>
+
+  <p>The core shape:</p>
+
+  <pre><code>type Tool&lt;Input, Output, P&gt; = &#123;
+  name: string
+  inputSchema: ZodType           // Zod schema for input validation
+  call(input, context, canUseTool,
+       parentMessage, onProgress): Promise&lt;ToolResult&gt;
+
+  // Behavior declarations
+  isConcurrencySafe(input): boolean   // Can run in parallel?
+  isReadOnly(input): boolean          // Read-only operation?
+  isDestructive(input): boolean       // Destructive action?
+
+  // Permission and validation
+  checkPermissions(input, context): Promise&lt;PermissionResult&gt;
+  validateInput(input, context): Promise&lt;ValidationResult&gt;
+
+  // API integration
+  description(input, options): Promise&lt;string&gt;
+  prompt(options): Promise&lt;string&gt;     // System prompt text for this tool
+  mapToolResultToToolResultBlockParam(result, toolUseId): ToolResultBlockParam
+
+  // UI rendering (React)
+  renderToolUseMessage(input, options): ReactNode
+  renderToolResultMessage(content, ...): ReactNode
+&#125;</code></pre>
+
+  <p>No tool implements this from scratch. A factory function called <code>buildTool()</code> fills in safe defaults:</p>
+
+  <div class="not-prose grid grid-cols-1 md:grid-cols-2 gap-[16px] my-6">
+    <div class="group relative border border-[#d2d0d0] rounded-[12px] p-[20px] hover:border-[#4a9ae8] hover:shadow-md transition-all cursor-default">
+      <p class="font-bold text-text-heading mb-[6px] font-dm-sans">isEnabled → true</p>
+      <p class="text-body-sm text-text-body-light font-dm-sans">Tools are on by default. Feature flags turn them off.</p>
+    </div>
+    <div class="group relative border border-[#d2d0d0] rounded-[12px] p-[20px] hover:border-[#4a9ae8] hover:shadow-md transition-all cursor-default">
+      <p class="font-bold text-text-heading mb-[6px] font-dm-sans">isConcurrencySafe → false</p>
+      <p class="text-body-sm text-text-body-light font-dm-sans">Fail-closed: assume NOT safe for parallel execution.</p>
+    </div>
+    <div class="group relative border border-[#d2d0d0] rounded-[12px] p-[20px] hover:border-[#4a9ae8] hover:shadow-md transition-all cursor-default">
+      <p class="font-bold text-text-heading mb-[6px] font-dm-sans">isReadOnly → false</p>
+      <p class="text-body-sm text-text-body-light font-dm-sans">Fail-closed: assume the tool writes.</p>
+    </div>
+    <div class="group relative border border-[#d2d0d0] rounded-[12px] p-[20px] hover:border-[#4a9ae8] hover:shadow-md transition-all cursor-default">
+      <p class="font-bold text-text-heading mb-[6px] font-dm-sans">checkPermissions → allow</p>
+      <p class="text-body-sm text-text-body-light font-dm-sans">Defers to the general permission system.</p>
+    </div>
+  </div>
+
+  <p>The defaults are deliberately conservative. A tool author who forgets to declare concurrency safety gets serial execution. A tool author who forgets to implement permission checks gets the default permission flow. The system fails closed.</p>
+
+  <p>The <code>ToolResult</code> type is worth noting:</p>
+
+  <pre><code>type ToolResult&lt;T&gt; = &#123;
+  data: T                    // The actual output
+  newMessages?: Message[]    // Optional follow-up messages
+  contextModifier?: (ctx) =&gt; ToolUseContext  // Mutate context for next tool
+  mcpMeta?: &#123; ... &#125;          // MCP protocol metadata
+&#125;</code></pre>
+
+  <p>The <code>contextModifier</code> is important &mdash; it lets a tool change the execution context for subsequent tools in the same turn. This is how tools like <code>EnterWorktree</code> change the working directory for everything that follows. Critically, context modifiers are only allowed for non-concurrency-safe tools. If a tool runs in parallel, it cannot modify shared state.</p>
+
+  <h2 id="tool-registry">The Tool Registry</h2>
+
+  <p>All tools are registered in a single function: <code>getAllBaseTools()</code> in <code>tools.ts</code>. It returns a flat array. Some tools are always present; others are gated behind feature flags, environment variables, or platform checks.</p>
+
+  <h4>Always Available (16 tools)</h4>
+
+  <div class="not-prose overflow-x-auto my-6">
+    <table class="w-full text-body-sm font-dm-sans border-collapse">
+      <thead>
+        <tr class="border-b border-border-light">
+          <th class="text-left py-[10px] px-[12px] text-text-heading font-bold">Tool</th>
+          <th class="text-left py-[10px] px-[12px] text-text-heading font-bold">Purpose</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="border-b border-border-light"><td class="py-[8px] px-[12px]"><code>bash</code></td><td class="py-[8px] px-[12px]">Execute shell commands</td></tr>
+        <tr class="border-b border-border-light"><td class="py-[8px] px-[12px]"><code>read</code></td><td class="py-[8px] px-[12px]">Read files (text, PDFs, images, notebooks)</td></tr>
+        <tr class="border-b border-border-light"><td class="py-[8px] px-[12px]"><code>edit</code></td><td class="py-[8px] px-[12px]">String-match replacement edits</td></tr>
+        <tr class="border-b border-border-light"><td class="py-[8px] px-[12px]"><code>write</code></td><td class="py-[8px] px-[12px]">Create or overwrite files</td></tr>
+        <tr class="border-b border-border-light"><td class="py-[8px] px-[12px]"><code>glob</code></td><td class="py-[8px] px-[12px]">Find files by pattern</td></tr>
+        <tr class="border-b border-border-light"><td class="py-[8px] px-[12px]"><code>grep</code></td><td class="py-[8px] px-[12px]">Search file contents via ripgrep</td></tr>
+        <tr class="border-b border-border-light"><td class="py-[8px] px-[12px]"><code>notebook_edit</code></td><td class="py-[8px] px-[12px]">Edit Jupyter notebook cells</td></tr>
+        <tr class="border-b border-border-light"><td class="py-[8px] px-[12px]"><code>web_fetch</code></td><td class="py-[8px] px-[12px]">Fetch and AI-process web content</td></tr>
+        <tr class="border-b border-border-light"><td class="py-[8px] px-[12px]"><code>agent</code></td><td class="py-[8px] px-[12px]">Spawn sub-agents with custom tasks</td></tr>
+        <tr class="border-b border-border-light"><td class="py-[8px] px-[12px]"><code>task_output</code></td><td class="py-[8px] px-[12px]">Read output from background tasks</td></tr>
+        <tr class="border-b border-border-light"><td class="py-[8px] px-[12px]"><code>task_stop</code></td><td class="py-[8px] px-[12px]">Stop background tasks</td></tr>
+        <tr class="border-b border-border-light"><td class="py-[8px] px-[12px]"><code>todo_write</code></td><td class="py-[8px] px-[12px]">Session task checklist</td></tr>
+        <tr class="border-b border-border-light"><td class="py-[8px] px-[12px]"><code>ask_user_question</code></td><td class="py-[8px] px-[12px]">Multi-choice questions to user</td></tr>
+        <tr class="border-b border-border-light"><td class="py-[8px] px-[12px]"><code>skill</code></td><td class="py-[8px] px-[12px]">Execute slash commands</td></tr>
+        <tr class="border-b border-border-light"><td class="py-[8px] px-[12px]"><code>enter_plan_mode</code></td><td class="py-[8px] px-[12px]">Switch to planning mode</td></tr>
+        <tr><td class="py-[8px] px-[12px]"><code>exit_plan_mode_v2</code></td><td class="py-[8px] px-[12px]">Exit plan mode with permission requests</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Feature-Gated Tools (~27 tools)</h4>
+
+  <p>The remaining tools are conditionally included. Some are gated behind environment variables (<code>USER_TYPE=ant</code> for Anthropic-internal tools like <code>config</code> and <code>tungsten</code>). Some are gated behind feature flags via Statsig (<code>web_browser</code>, <code>sleep</code>, <code>monitor</code>). Some are platform-specific (<code>powershell</code> on Windows). Some are gated behind compound conditions &mdash; the <code>repl</code> tool requires both <code>USER_TYPE=ant</code> and a REPL feature flag.</p>
+
+  <details class="not-prose my-6 border border-[#d2d0d0] rounded-[12px] overflow-hidden">
+    <summary class="cursor-pointer px-[20px] py-[14px] font-bold font-dm-sans text-text-heading bg-bg-secondary hover:bg-[#eef5ff] transition-colors">
+      Full list of feature-gated tools
+    </summary>
+    <div class="px-[20px] py-[16px] text-body-sm font-dm-sans text-text-body bg-white flex flex-col gap-[6px]">
+      <p><strong>Ant-only:</strong> <code>config</code>, <code>tungsten</code>, <code>suggest_background_pr</code>, <code>repl</code> (also needs REPL flag)</p>
+      <p><strong>Feature flags:</strong> <code>web_browser</code>, <code>web_search</code>, <code>sleep</code>, <code>monitor</code>, <code>overflow_test</code>, <code>ctx_inspect</code>, <code>terminal_capture</code>, <code>list_peers</code>, <code>workflow</code>, <code>snip</code></p>
+      <p><strong>Agent triggers:</strong> <code>cron_create</code>, <code>cron_delete</code>, <code>cron_list</code>, <code>remote_trigger</code></p>
+      <p><strong>Kairos (proactive agent):</strong> <code>sleep</code>, <code>send_user_file</code>, <code>push_notification</code>, <code>subscribe_pr</code></p>
+      <p><strong>Multi-agent swarms:</strong> <code>team_create</code>, <code>team_delete</code>, <code>send_message</code></p>
+      <p><strong>Todo v2:</strong> <code>task_create</code>, <code>task_get</code>, <code>task_update</code>, <code>task_list</code></p>
+      <p><strong>Environment:</strong> <code>lsp</code> (ENABLE_LSP_TOOL), <code>enter_worktree</code> / <code>exit_worktree</code> (worktree mode), <code>powershell</code> (Windows)</p>
+      <p><strong>Tool discovery:</strong> <code>tool_search</code> (when tool pool is large)</p>
+      <p><strong>Test-only:</strong> <code>testing_permission</code> (NODE_ENV=test)</p>
+    </div>
+  </details>
+
+  <p>A comment in the source notes that this list must stay in sync with Statsig dynamic config &mdash; the feature flag service &mdash; for prompt caching to work. If the tool list changes mid-session because a flag flips, the cached system prompt becomes stale.</p>
+
+  <h2 id="mcp-tools">MCP Tools</h2>
+
+  <p>Beyond built-in tools, Claude Code supports <strong>Model Context Protocol (MCP)</strong> servers &mdash; external processes that expose their own tools over a standardized protocol. MCP tools are dynamically registered at runtime from connected servers and wrapped in the same <code>Tool</code> interface. From the dispatch pipeline's perspective, an MCP tool is indistinguishable from a built-in tool.</p>
+
+  <p>Each MCP tool carries metadata about its origin server (<code>mcpInfo: &#123; serverName, toolName &#125;</code>), which is used for permission rules, error handling, and authentication. When an MCP tool fails with an auth error, the system automatically updates the server's status to <code>needs-auth</code> and surfaces the issue to the user.</p>
+
+  <h2 id="tool-pool-assembly">Tool Pool Assembly</h2>
+
+  <p>Three functions assemble the final tool set:</p>
+
+  <ol>
+    <li><code>getAllBaseTools()</code> &mdash; returns the raw list of 43+ built-in tools with feature gates applied</li>
+    <li><code>getTools(permissionContext)</code> &mdash; filters by deny rules and <code>isEnabled()</code></li>
+    <li><code>assembleToolPool(permissionContext, mcpTools)</code> &mdash; merges built-in and MCP tools</li>
+  </ol>
+
+  <p>The merge strategy in <code>assembleToolPool()</code> is deliberate:</p>
+
+  <pre><code>// Sort each partition alphabetically, concat, deduplicate
+const byName = (a, b) =&gt; a.name.localeCompare(b.name)
+return uniqBy(
+  [...builtInTools].sort(byName).concat(allowedMcpTools.sort(byName)),
+  'name',
+)</code></pre>
+
+  <p>Built-in tools come first, so on a name collision, the built-in wins. Alphabetical sorting within each partition keeps the order stable across sessions, which matters for prompt caching &mdash; the tools array is part of the API request, and reordering it would bust the cache.</p>
+
+  <h2 id="api-serialization">API Serialization</h2>
+
+  <p>Before tools reach the Claude API, <code>toolToAPISchema()</code> converts each tool's Zod schema into the Anthropic API's JSON Schema format. This function also attaches metadata:</p>
+
+  <ul>
+    <li><strong><code>defer_loading</code></strong> &mdash; for tool search. When the tool pool is large, rarely-used tools are marked as deferred. The model can discover them via the <code>tool_search</code> tool instead of having their full schemas in every request.</li>
+    <li><strong><code>cache_control</code></strong> &mdash; ephemeral caching with scope (global or org) and TTL (5 minutes or 1 hour).</li>
+    <li><strong><code>strict</code></strong> &mdash; enables structured output validation when a feature flag is on.</li>
+    <li><strong><code>eager_input_streaming</code></strong> &mdash; allows the API to stream tool input tokens as they're generated, enabling the streaming executor to start tools before the model finishes writing the full input.</li>
+  </ul>
+
+  <p>Schema results are cached per session to prevent mid-session drift from feature flag changes.</p>
+
+  <h2 id="extraction">The Dispatch Pipeline</h2>
+
+  <p>When Claude responds, its message may contain <code>tool_use</code> blocks &mdash; structured requests to invoke tools. The dispatch pipeline processes these blocks through seven phases. Every tool call goes through every phase, in order.</p>
+
+  <h4 id="extraction">Phase 1: Extraction</h4>
+
+  <p>In the main query loop (<code>query.ts</code>), tool_use blocks are filtered out of the assistant message:</p>
+
+  <pre><code>const msgToolUseBlocks = message.message.content.filter(
+  content =&gt; content.type === 'tool_use',
+) as ToolUseBlock[]</code></pre>
+
+  <p>Each block has a <code>name</code>, an <code>input</code> object, and a unique <code>id</code>. The id is critical &mdash; the tool result must reference the same id when sent back to the API, or the conversation breaks.</p>
+
+  <h4 id="input-validation">Phase 2: Input Validation</h4>
+
+  <p>The tool's Zod schema validates the raw input using <code>safeParse()</code> &mdash; a non-throwing variant that returns either valid data or a structured error. If validation fails, the model gets a formatted error message with schema hints, and execution stops for that tool. No code runs on invalid input.</p>
+
+  <pre><code>const parsedInput = tool.inputSchema.safeParse(input)
+if (!parsedInput.success) &#123;
+  let errorContent = formatZodValidationError(tool.name, parsedInput.error)
+  // Return error to model, skip execution
+&#125;</code></pre>
+
+  <p>After Zod validation, some tools run a second <code>validateInput()</code> check for semantic validation that can't be expressed in a schema &mdash; for example, verifying that a file path is absolute, not relative.</p>
+
+  <h4 id="pre-tool-hooks">Phase 3: Pre-Tool Hooks</h4>
+
+  <p>Before permission checks, user-configured hooks execute. These are external shell commands or scripts that fire on tool invocations. A pre-tool hook can:</p>
+
+  <ul>
+    <li><strong>Allow</strong> the tool call, bypassing the interactive permission prompt</li>
+    <li><strong>Deny</strong> the tool call outright</li>
+    <li><strong>Modify the input</strong> before execution</li>
+    <li><strong>Block execution</strong> with an error message</li>
+    <li><strong>Provide additional context</strong> to the user</li>
+  </ul>
+
+  <p>A critical invariant: a hook's <code>allow</code> does <strong>not</strong> bypass deny rules from settings. The source code has an explicit comment about this: "Hook 'allow' does NOT bypass settings.json deny/ask rules." The intent is that hooks can open doors, but not override locks.</p>
+
+  <h4 id="permission-check">Phase 4: Permission Check</h4>
+
+  <p>The permission system is the most intricate part of the pipeline. It resolves through multiple layers, in order:</p>
+
+  <ol>
+    <li><strong>Deny rules</strong> &mdash; checked first. If any deny rule matches, execution stops immediately. Deny rules are final and cannot be overridden by any other layer.</li>
+    <li><strong>Ask rules</strong> &mdash; if matched, the user is prompted for approval (unless sandbox auto-allow applies for Bash).</li>
+    <li><strong>Tool-specific permissions</strong> &mdash; the tool's own <code>checkPermissions()</code> method runs. BashTool, for instance, parses the command to check subcommand-level rules.</li>
+    <li><strong>Safety checks</strong> &mdash; hardcoded protections for sensitive paths (<code>.git/</code>, <code>.claude/</code>, shell configs). These are bypass-immune &mdash; even in full bypass mode, they require interactive approval.</li>
+    <li><strong>Permission mode</strong> &mdash; the user's configured mode determines the default behavior.</li>
+    <li><strong>Allow rules</strong> &mdash; checked last. If an allow rule matches and no deny/ask rule was triggered, the tool proceeds.</li>
+  </ol>
+
+  <details class="not-prose my-6 border border-[#d2d0d0] rounded-[12px] overflow-hidden">
+    <summary class="cursor-pointer px-[20px] py-[14px] font-bold font-dm-sans text-text-heading bg-bg-secondary hover:bg-[#eef5ff] transition-colors">
+      Permission modes
+    </summary>
+    <div class="px-[20px] py-[16px] text-body-sm font-dm-sans text-text-body bg-white flex flex-col gap-[12px]">
+      <p><strong>default</strong> &mdash; Always prompt the user for "ask" decisions.</p>
+      <p><strong>acceptEdits</strong> &mdash; Auto-allow safe file operations (reads, edits), prompt for everything else.</p>
+      <p><strong>bypassPermissions</strong> &mdash; Auto-allow everything except deny rules and safety checks.</p>
+      <p><strong>plan</strong> &mdash; Approve a plan first, then follow the previous mode for execution.</p>
+      <p><strong>auto</strong> &mdash; Use an AI classifier to decide whether to allow or prompt.</p>
+      <p><strong>dontAsk</strong> &mdash; Convert all "ask" decisions to "deny" &mdash; never prompt, just refuse.</p>
+    </div>
+  </details>
+
+  <p>Permission rules come from multiple sources, resolved in priority order: <code>policySettings</code>, <code>localSettings</code>, <code>projectSettings</code>, <code>userSettings</code>, <code>flagSettings</code>, <code>cliArg</code>, <code>command</code>, <code>session</code>. This lets organization policies override user preferences, and CLI arguments override both.</p>
+
+  <h4 id="tool-execution">Phase 5: Execution</h4>
+
+  <p>If permission is granted, the tool's <code>call()</code> method is invoked:</p>
+
+  <pre><code>const result = await tool.call(
+  callInput,
+  &#123; ...toolUseContext, toolUseId: toolUseID &#125;,
+  canUseTool,
+  assistantMessage,
+  progress =&gt; onToolProgress(&#123; toolUseID: progress.toolUseID, data: progress.data &#125;)
+)</code></pre>
+
+  <p>Five arguments: the validated input, an execution context (working directory, abort controller, app state), a permission callback (for tools that need to request additional permissions mid-execution), the parent assistant message, and a progress callback for real-time updates. Duration is tracked globally.</p>
+
+  <p>A subtle detail: the input passed to <code>call()</code> is the model's <strong>original input</strong>, not the backfilled version that hooks and permissions saw. This preserves transcript consistency &mdash; the tool call recorded in the conversation matches exactly what the model generated.</p>
+
+  <h4 id="post-tool-hooks">Phase 6: Post-Tool Hooks</h4>
+
+  <p>After execution, post-tool hooks fire. These can modify MCP tool output, provide additional context, or block the conversation from continuing. There is also a separate <code>PostToolUseFailure</code> hook that fires only on errors, giving external systems a chance to log failures or suggest remediation.</p>
+
+  <h4 id="result-mapping">Phase 7: Result Mapping</h4>
+
+  <p>Each tool implements <code>mapToolResultToToolResultBlockParam()</code> to convert its output into the Anthropic API's <code>ToolResultBlockParam</code> format &mdash; a <code>tool_result</code> block with a <code>tool_use_id</code> reference and string or structured content.</p>
+
+  <p>If the result exceeds a size threshold, it is persisted to disk at <code>sessionDir/tool-results/&#123;toolUseId&#125;.txt</code> and a preview with a file reference is sent to the API instead. This prevents large outputs (a 10,000-line file read, a verbose command output) from bloating the conversation context.</p>
+
+  <h2 id="concurrency">The Concurrency Scheduler</h2>
+
+  <p>When the model emits multiple tool calls in a single message, they don't all run at once. A scheduler partitions them into batches based on concurrency safety.</p>
+
+  <p>The algorithm is simple. Walk the tool calls in order. For each one, check <code>isConcurrencySafe(input)</code>. If it is safe and the previous batch was also safe, add it to the batch. Otherwise, start a new batch.</p>
+
+  <pre><code>// Simplified from toolOrchestration.ts
+for (const toolUse of toolUseMessages) &#123;
+  const isSafe = tool.isConcurrencySafe(parsedInput)
+  if (isSafe &amp;&amp; lastBatch.isConcurrencySafe) &#123;
+    lastBatch.blocks.push(toolUse)    // Merge into concurrent batch
+  &#125; else &#123;
+    batches.push(&#123; isConcurrencySafe: isSafe, blocks: [toolUse] &#125;)
+  &#125;
+&#125;</code></pre>
+
+  <p>Safe batches run concurrently (up to a limit of 10, configurable via <code>CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY</code>). Unsafe batches run serially, one tool at a time. Context modifiers are only applied between batches, not within them.</p>
+
+  <p>In practice, this means a message like "read these 5 files" produces one concurrent batch, while "read this file, then edit it" produces two serial batches. The model can even trigger both patterns in a single turn &mdash; consecutive read-only calls get batched, and the first write breaks the batch.</p>
+
+  <h4>The Streaming Executor</h4>
+
+  <p>There is a second execution path: the <code>StreamingToolExecutor</code>. When streaming is enabled, tools start executing <strong>while the model is still generating its response</strong>. As each tool_use block completes in the stream, it's immediately queued for execution rather than waiting for the full response.</p>
+
+  <p>The streaming executor uses the same concurrency rules but adds one behavior: <strong>Bash error cascading</strong>. If a Bash command fails while sibling tools are running in parallel, the executor aborts all siblings. The rationale is that a failing Bash command likely invalidates the context that other tools are operating on &mdash; continuing them wastes time and may cause confusing errors.</p>
+
+  <pre><code>if (isErrorResult &amp;&amp; tool.block.name === BASH_TOOL_NAME) &#123;
+  this.hasErrored = true
+  this.siblingAbortController.abort('sibling_error')
+&#125;</code></pre>
+
+  <h2>A Worked Example</h2>
+
+  <p>To make this concrete, let's trace what happens when the model decides to read a file. The model emits:</p>
+
+  <pre><code>&#123;
+  "type": "tool_use",
+  "id": "toolu_01XYZ",
+  "name": "read",
+  "input": &#123; "file_path": "/src/index.ts" &#125;
+&#125;</code></pre>
+
+  <ol>
+    <li><strong>Extraction</strong>: <code>query.ts</code> filters this from the assistant message content.</li>
+    <li><strong>Tool lookup</strong>: <code>findToolByName(tools, "read")</code> finds FileReadTool.</li>
+    <li><strong>Input validation</strong>: Zod parses <code>&#123; file_path: "/src/index.ts" &#125;</code> against <code>z.object(&#123; file_path: z.string(), offset: z.number().optional(), limit: z.number().optional(), pages: z.string().optional() &#125;)</code>. It passes.</li>
+    <li><strong>Pre-tool hooks</strong>: Any user-configured hooks fire. None modify the input.</li>
+    <li><strong>Permission check</strong>: FileReadTool's <code>checkPermissions()</code> calls <code>checkReadPermissionForTool()</code>. Read tools are generally allowed in most permission modes.</li>
+    <li><strong>Execution</strong>: <code>FileReadTool.call()</code> reads the file, applies line numbering (<code>cat -n</code> format), handles PDFs/images/notebooks as special cases.</li>
+    <li><strong>Result mapping</strong>: The file contents become a <code>tool_result</code> block referencing <code>"toolu_01XYZ"</code>.</li>
+    <li><strong>Return</strong>: The result is appended to the conversation as a user message and sent in the next API call.</li>
+  </ol>
+
+  <p>Because FileReadTool declares <code>isConcurrencySafe: () => true</code> and <code>isReadOnly: () => true</code>, if the model had emitted five read calls in the same message, all five would execute in parallel.</p>
+
+  <h2>Summary</h2>
+
+  <p>The tool system is the execution backbone of Claude Code. It takes the model's intent &mdash; expressed as structured tool_use blocks &mdash; and turns it into real actions on your machine, with validation, permissions, and concurrency control at every step.</p>
+
+  <p>The design is layered: a conservative <code>buildTool()</code> factory ensures safe defaults, a feature-gated registry controls what's available, a seven-phase dispatch pipeline validates and permissions-checks every call, and a concurrency scheduler maximizes parallelism while preserving correctness. The streaming executor adds a performance optimization on top &mdash; tools start running before the model finishes thinking.</p>
+
+  <p>Compared to the memory system (5 paths, a directory of markdown files, and prompt engineering), the tool system is a proper runtime. It is the difference between a filing cabinet and an operating system.</p>
+
+  <h2>What's Interesting</h2>
+
+  <h4>The Model as Scheduler</h4>
+
+  <p>The concurrency scheduler is reactive &mdash; it batches whatever the model emits. But the model itself is the real scheduler. The system prompt tells it to "make all independent tool calls in parallel" and to "use a single Bash call with && to chain dependent commands." The runtime trusts this. If the model emits five reads followed by a write, the scheduler will parallelize the reads and serialize the write. But the model decided that order. The scheduler is enforcing the model's plan, not making its own.</p>
+
+  <h4>Fail-Closed by Default</h4>
+
+  <p>The most consistent design principle: everything fails closed. Unknown tool? Error. Invalid input? Error. No concurrency declaration? Serial execution. No permission declaration? Ask the user. No feature flag? Tool doesn't exist. This is unusual for a system where the primary user is an AI model that might hallucinate tool names or malform inputs. The system is designed to contain the model's mistakes, not accommodate them.</p>
+
+  <h4>Hooks as an Extension Point</h4>
+
+  <p>The hook system &mdash; pre-tool, post-tool, and post-failure &mdash; is the primary extension point. It's how organizations enforce policy (deny rules in pre-hooks), how logging systems capture tool usage (post-hooks), and how CI/CD pipelines integrate (failure hooks). Importantly, hooks can only tighten restrictions, not loosen them. A hook can deny a tool the settings allow, but it cannot allow a tool the settings deny.</p>
+
+  <h4>43 Tools, 1 Interface</h4>
+
+  <p>Perhaps the most striking thing is uniformity. A <code>bash</code> command, a <code>web_fetch</code>, a subagent spawn, a cron job creation, and a push notification all implement the same 30-method interface, go through the same seven-phase pipeline, and respect the same permission system. There are no special cases in the dispatcher. The complexity is in the individual tool implementations and in the permission rules, not in the routing.</p>
+
+  <script is:inline src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <script is:inline>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      securityLevel: 'loose',
+      themeVariables: {
+        primaryColor: '#f4f3f3',
+        primaryTextColor: '#151211',
+        primaryBorderColor: '#8f8a88',
+        lineColor: '#787270',
+        secondaryColor: '#f4f3f3',
+        tertiaryColor: '#ffffff',
+        fontFamily: 'DM Sans, sans-serif',
+        fontSize: '14px',
+        clusterBkg: '#eef5ff',
+        clusterBorder: '#4a9ae8',
+        nodeTextColor: '#151211'
+      }
+    });
+
+    document.addEventListener('click', function(e) {
+      var link = e.target.closest('a[href^="#"]');
+      if (!link) return;
+      var href = link.getAttribute('href');
+      if (!href || href.length < 2) return;
+      var target = document.getElementById(href.slice(1));
+      if (!target) return;
+      e.preventDefault();
+      var rect = target.getBoundingClientRect();
+      var offset = window.scrollY + rect.top - 80;
+      window.scrollTo({ top: offset, behavior: 'smooth' });
+    });
+  </script>
+</BlogPost>
