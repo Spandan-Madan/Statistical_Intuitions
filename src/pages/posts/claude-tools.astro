@@ -194,8 +194,6 @@ import BlogPost from "../../layouts/BlogPost.astro";
     </div>
   </details>
 
-  <p>A comment in the source notes that this list must stay in sync with Statsig dynamic config &mdash; the feature flag service &mdash; for prompt caching to work. If the tool list changes mid-session because a flag flips, the cached system prompt becomes stale.</p>
-
   <h2 id="mcp-tools">MCP Tools</h2>
 
   <p>Beyond built-in tools, Claude Code supports <strong>Model Context Protocol (MCP)</strong> servers &mdash; external processes that expose their own tools over a standardized protocol. MCP tools are dynamically registered at runtime from connected servers and wrapped in the same <code>Tool</code> interface. From the dispatch pipeline's perspective, an MCP tool is indistinguishable from a built-in tool.</p>
@@ -225,16 +223,7 @@ return uniqBy(
 
   <h2 id="api-serialization">API Serialization</h2>
 
-  <p>Before tools reach the Claude API, <code>toolToAPISchema()</code> converts each tool's Zod schema into the Anthropic API's JSON Schema format. This function also attaches metadata:</p>
-
-  <ul>
-    <li><strong><code>defer_loading</code></strong> &mdash; for tool search. When the tool pool is large, rarely-used tools are marked as deferred. The model can discover them via the <code>tool_search</code> tool instead of having their full schemas in every request.</li>
-    <li><strong><code>cache_control</code></strong> &mdash; ephemeral caching with scope (global or org) and TTL (5 minutes or 1 hour).</li>
-    <li><strong><code>strict</code></strong> &mdash; enables structured output validation when a feature flag is on.</li>
-    <li><strong><code>eager_input_streaming</code></strong> &mdash; allows the API to stream tool input tokens as they're generated, enabling the streaming executor to start tools before the model finishes writing the full input.</li>
-  </ul>
-
-  <p>Schema results are cached per session to prevent mid-session drift from feature flag changes.</p>
+  <p>Before tools reach the Claude API, <code>toolToAPISchema()</code> converts each tool's Zod schema into the Anthropic API's JSON Schema format.</p>
 
   <h2 id="extraction">The Dispatch Pipeline</h2>
 
