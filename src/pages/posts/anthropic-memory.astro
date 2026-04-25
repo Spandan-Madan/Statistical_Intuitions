@@ -2,14 +2,14 @@
 import BlogPost from "../../layouts/BlogPost.astro";
 ---
 
-<BlogPost title="The Memory Architecture of Claude Code" subtitle="A deep dive into how Claude Code remembers you across sessions" date="April 2026">
+<BlogPost title="The Memory Architecture of the Anthropic Harness" subtitle="A deep dive into how the Anthropic Harness remembers you across sessions" date="April 2026">
   <h2>Introduction</h2>
 
-  <p>Since the rise of frontier AI labs like OpenAI, Anthropic, and Google DeepMind, progress in AI systems has largely taken place behind closed doors, with little visibility into their underlying implementations. That changed last week, when the source code for Claude Code leaked&mdash;offering a rare glimpse into how Anthropic's flagship product handles memory.</p>
+  <p>Since the rise of frontier AI labs like OpenAI, Anthropic, and Google DeepMind, progress in AI systems has largely taken place behind closed doors, with little visibility into their underlying implementations. That changed last week, when the source code for Claude Code leaked&mdash;offering a rare glimpse into how the Anthropic Harness handles memory.</p>
 
   <p>Large language models are inherently stateless. Every session begins from scratch: you re-explain your project, restate your preferences, and reestablish context&mdash;only to repeat the process the next day. This limitation is well known, and a wide range of solutions has emerged, from retrieval-augmented generation (RAG) with vector databases to more advanced approaches like Graph RAG and file-based search systems.</p>
 
-  <p>Claude Code takes a different approach. It relies on a file-based memory system combined with extensive prompt engineering. This post presents a deep dive into that system, reverse-engineered from the leaked source code. At its core, the design is surprisingly simple: memories are stored as short (~150-character) text entries written to disk. The responsibility for reading and writing these memories is delegated to the language model itself.</p>
+  <p>The Anthropic Harness takes a different approach. It relies on a file-based memory system combined with extensive prompt engineering. This post presents a deep dive into that system, reverse-engineered from the leaked source code. At its core, the design is surprisingly simple: memories are stored as short (~150-character) text entries written to disk. The responsibility for reading and writing these memories is delegated to the language model itself.</p>
 
   <p>The system boils down to five core paths: three for reading memories and two for writing them. All paths operate on a shared storage of markdown files on disk.</p>
 
@@ -217,7 +217,7 @@ import BlogPost from "../../layouts/BlogPost.astro";
 
   <h2>What's Missing</h2>
 
-  <p>As a model of memory, Claude Code's approach is closer to a filing cabinet than the human brain. Comparing it to how human memory actually works, the following fundamental gaps emerge.</p>
+  <p>As a model of memory, the Anthropic Harness's approach is closer to a filing cabinet than the human brain. Comparing it to how human memory actually works, the following fundamental gaps emerge.</p>
 
   <h4>Reactive, not Pro-active</h4>
 
@@ -231,7 +231,7 @@ import BlogPost from "../../layouts/BlogPost.astro";
 
   <p>Sonnet matches frontmatter descriptions against your message &mdash; essentially semantic text search. For a memory to make it to Claude, your prompt must contain the exact words mentioned in the memory. In sharp contrast, human memory is associative: one memory triggers another, forming chains of recall across multiple hops. Claude's retrieval is flat. There is no chaining, no "this reminds me of that."</p>
 
-  <p>Claude Code's memory system is a pragmatic engineering solution to a real limitation &mdash; Large Language Models are stateless, and were not designed to model human memory. As such, it addresses the immediate need. However, the architecture does not attempt to capture the three properties that cognitive science identifies as fundamental to human memory &mdash; <strong>proactive</strong> recall, <strong>lifelong</strong> retention, and <strong>associative</strong> retrieval. Bridging this gap between information storage and true memory remains an open and important problem.</p>
+  <p>The Anthropic Harness's memory system is a pragmatic engineering solution to a real limitation &mdash; Large Language Models are stateless, and were not designed to model human memory. As such, it addresses the immediate need. However, the architecture does not attempt to capture the three properties that cognitive science identifies as fundamental to human memory &mdash; <strong>proactive</strong> recall, <strong>lifelong</strong> retention, and <strong>associative</strong> retrieval. Bridging this gap between information storage and true memory remains an open and important problem.</p>
 
   <script is:inline src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
   <script is:inline>
