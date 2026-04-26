@@ -1,0 +1,203 @@
+---
+import BlogPost from "../../layouts/BlogPost.astro";
+---
+
+<BlogPost title="The Efficiency gap in hardware driving biology and AI" subtitle="How do cells and GPUs compare when running the exact same algorithm?" date="May 2026">
+  <h2>Why this question, now</h2>
+
+  <p>AI hardware is having a moment. Hyperscaler capex on AI data centres is on track to clear <a href="https://futurumgroup.com/insights/ai-capex-2026-the-690b-infrastructure-sprint/">$690 billion in 2026</a>, and private equity has followed in scale &mdash; <a href="https://www.afire.org/summit/machinecenter/">Blackstone alone reports a $55B+ data-centre portfolio with another $70B in the pipeline</a>. Almost all of that money is being spent on the architecture we already have: more GPUs, more accelerators, more cooling, more power. The pitch is straightforward &mdash; train and serve existing AI algorithms more efficiently, and unit costs come down.</p>
+
+  <p>On the venture side, huge bets are being made into hardware AI companies as well. In December 2025, <a href="https://techcrunch.com/2025/12/09/unconventional-ai-confirms-its-massive-475m-seed-round/">Unconventional AI raised a $475M seed at a $4.5B valuation</a>, led by a16z and Lightspeed with Sequoia, Lux, DCVC, and Bezos joining. The pitch is not to make GPUs cheaper or efficient, but to build a computational substrate that runs neural networks <em>directly on the nonlinear physics of silicon</em>, taking inspiration from biology, on the bet that the hardware biology runs on is far more efficient than AI. They are not alone &mdash; <a href="https://www.startus-insights.com/innovators-guide/neuromorphic-computing-companies/">several neuromorphic startups (Rain, Innatera, SpiNNcloud, BrainChip, and others)</a> are working on variants of this pitch.</p>
+
+  <p>This thesis turns on an empirical claim: that biology-inspired hardware can do things that conventional hardware structurally cannot, not just things that conventional hardware does more cheaply. The strong form of the claim is that closing the gap between current AI and human intelligence might require closing the gap between silicon and biology &mdash;. The weaker form is that biology has a cost-of-compute advantage so dramatic that the substrate matters even for tasks we already know how to do.</p>
+
+  <p>Both forms depend on the same number: <em>how big is the gap, exactly</em>? The literature is full of order-of-magnitude estimates &mdash; "the brain runs on 20 watts, GPT-4 takes a city" &mdash; that compare two systems doing two different things at two different scales. They are evocative but not falsifiable. The cleaner question is what happens when we hold the algorithm constant and just vary the substrate. That number is what determines whether biology-inspired hardware is a contrarian bet or a structural one.</p>
+
+  <p>The rest of this post computes that number for one extremely well-characterised algorithm.</p>
+
+  <h2>Introduction</h2>
+
+  <p>Modern AI is the product of two compounding revolutions: better algorithms (transformers, RLHF, scaling laws) and better hardware (GPUs, TPUs, custom accelerators). It is rarely clear which deserves more credit on any given metric. The question matters because it tells you where the next gains will come from.</p>
+
+  <p>The cleanest way to disentangle the two is to hold one constant and vary the other. We can hold <em>hardware</em> constant and compare algorithms &mdash; that is what most ML benchmarking already does. The harder direction is to hold <em>software</em> constant and compare hardware. Specifically: take a fixed algorithm, run it on biological hardware and on silicon hardware, and measure how much energy each substrate spends to execute one instance of that algorithm.</p>
+
+  <p>The roadblock is finding an algorithm. The biological process must be known with enough mechanistic clarity that we can transcribe it directly into code, and it must have a discrete, countable unit of computation so that "one execution" maps 1:1 between biology and silicon. No continuum approximations, no ensemble averages.</p>
+
+  <p>This post walks through one such algorithm &mdash; a single cycle of the Na<sup>+</sup>/K<sup>+</sup>-ATPase pump &mdash; and computes the energy cost on both sides.</p>
+
+  <h2>The Algorithm: One Cycle of the Na<sup>+</sup>/K<sup>+</sup>-ATPase Pump</h2>
+
+  <p>The obvious first candidate is the Hodgkin-Huxley action potential &mdash; verified for seventy years, atomic-resolution channel structures, every neuroscience student writes a Python implementation. It fails our test. Hodgkin-Huxley is a continuum description: currents and capacitance are <em>per unit area</em>, and a single integration produces the trajectory for an isopotential patch of any size. The biological axon must commit to a physical area; energy scales linearly with it. There is no canonical "one execution." The same problem rules out anything described by a partial differential equation or a mean-field approximation &mdash; the ensemble averaging that makes those models accurate is what destroys the 1:1 mapping we need.</p>
+
+  <p>The right candidate is a process where biology itself executes a discrete number of well-defined operations. The Na<sup>+</sup>/K<sup>+</sup>-ATPase fits. It is the membrane protein that maintains the Na<sup>+</sup> and K<sup>+</sup> gradients in every animal cell, and one cycle hydrolyzes one ATP, exports three Na<sup>+</sup> ions, and imports two K<sup>+</sup> ions. The mechanism &mdash; the Post-Albers cycle &mdash; is among the best-characterized in biochemistry: atomic-resolution structures of multiple intermediate states, single-molecule kinetics, and a complete kinetic scheme with measured rate constants. Heyse, Wuddel, Apell &amp; St&uuml;rmer (1994) determined the rate constants from rabbit kidney enzyme at 20&nbsp;&deg;C, publishing a complete table sufficient to simulate the entire pump in code. We use the linear forward branch of their scheme &mdash; eleven states, eleven transitions &mdash; under standard physiological substrate concentrations.</p>
+
+  <p>The states, in order around the cycle:</p>
+
+  <ol>
+    <li><strong>E1</strong> &mdash; empty, cytoplasm-facing</li>
+    <li><strong>Na<sub>3</sub>&middot;E1</strong> &mdash; three Na<sup>+</sup> bound</li>
+    <li><strong>Na<sub>3</sub>&middot;E1&middot;ATP</strong> &mdash; ATP bound (high-affinity site)</li>
+    <li><strong>(Na<sub>3</sub>)E1-P</strong> &mdash; phosphorylated, Na<sup>+</sup> occluded</li>
+    <li><strong>P-E2(Na<sub>2</sub>)</strong> &mdash; conformation flipped, first Na<sup>+</sup> released</li>
+    <li><strong>P-E2(Na)</strong> &mdash; second Na<sup>+</sup> released</li>
+    <li><strong>P-E2</strong> &mdash; third Na<sup>+</sup> released</li>
+    <li><strong>P-E2(K)</strong> &mdash; first K<sup>+</sup> bound</li>
+    <li><strong>P-E2(K<sub>2</sub>)</strong> &mdash; second K<sup>+</sup> bound</li>
+    <li><strong>E2(K<sub>2</sub>)</strong> &mdash; dephosphorylated, K<sup>+</sup> occluded</li>
+    <li><strong>ATP&middot;E2(K<sub>2</sub>)</strong> &mdash; ATP bound (low-affinity site) &rarr; returns to state 1</li>
+  </ol>
+
+  <p>Each transition has a forward and backward rate constant. The rate-limiting steps at 20&nbsp;&deg;C are the two conformational flips: state 4 &rarr; 5 (k<sub>f</sub> = 22 s<sup>&minus;1</sup>) and state 11 &rarr; 1 (k<sub>f</sub> = 22 s<sup>&minus;1</sup>). Everything else is at least an order of magnitude faster.</p>
+
+  <h2>The Code</h2>
+
+  <p>Biology executes this cycle stochastically: a single protein molecule, under thermal noise, hops between conformational states with rates set by the chemistry. The faithful in-silico equivalent is a Gillespie simulation &mdash; sample the time to the next transition from an exponential distribution, sample which transition fires from the rate ratios, and step until the molecule has completed one full cycle.</p>
+
+  <pre><code>import time
+import numpy as np
+
+# Forward (kf) and backward (kb) rates in s^-1, at 20 C, physiological substrates.
+TRANSITIONS = [
+    (2.0e3,  8.0e2),    #  0  E1            -&gt; Na3.E1
+    (7.5e4,  1.64),     #  1  Na3.E1        -&gt; Na3.E1.ATP
+    (2.0e2,  18.5),     #  2  Na3.E1.ATP    -&gt; (Na3)E1-P
+    (22.0,   25.2),     #  3  (Na3)E1-P     -&gt; P-E2(Na2)        [rate-limiting]
+    (5.0e3,  375.2),    #  4  P-E2(Na2)     -&gt; P-E2(Na)
+    (1.0e5,  1.4e5),    #  5  P-E2(Na)      -&gt; P-E2
+    (1.7e2,  10.0),     #  6  P-E2          -&gt; P-E2(K)
+    (2.5e4,  2.0e3),    #  7  P-E2(K)       -&gt; P-E2(K2)
+    (1.0e3,  5.0e3),    #  8  P-E2(K2)      -&gt; E2(K2)
+    (2.5e3,  4.0),      #  9  E2(K2)        -&gt; ATP.E2(K2)
+    (22.0,   400.0),    # 10  ATP.E2(K2)    -&gt; E1                [rate-limiting]
+]
+N  = len(TRANSITIONS)
+KF = np.array([t[0] for t in TRANSITIONS])
+KB = np.array([t[1] for t in TRANSITIONS])
+
+def simulate_one_cycle(rng):
+    state, t, net = 0, 0.0, 0
+    while net &lt; N:
+        # At state s: forward rate = KF[s] (transition s -&gt; s+1).
+        # Backward rate = KB[s-1] (the reverse of transition s-1 -&gt; s,
+        # which is the one that LANDS on s). Note the offset.
+        kf = KF[state]
+        kb = KB[(state - 1) % N]
+        k_total = kf + kb
+        t += -np.log(rng.random()) / k_total
+        if rng.random() &lt; kf / k_total:
+            state = (state + 1) % N
+            net  += 1
+        else:
+            state = (state - 1) % N
+            net  -= 1
+    return t
+
+rng       = np.random.default_rng(42)
+n_trials  = 100_000
+wall_t0   = time.perf_counter()
+times     = np.array([simulate_one_cycle(rng) for _ in range(n_trials)])
+wall_dt   = time.perf_counter() - wall_t0
+
+bio_J_per_cycle = 50e3 / 6.022e23                       # 1 ATP at 50 kJ/mol
+si_J_per_cycle  = (wall_dt / n_trials) * 15.0           # 15 W active CPU power
+
+print(f"Mean simulated cycle time (biological):   &#123;times.mean()*1e3:.2f&#125; ms")
+print(f"Wall-clock per simulated cycle (silicon): &#123;wall_dt/n_trials*1e6:.2f&#125; us")
+print(f"Biology:  &#123;bio_J_per_cycle:.2e&#125; J / cycle")
+print(f"Silicon:  &#123;si_J_per_cycle:.2e&#125; J / cycle")
+print(f"Ratio:    &#123;si_J_per_cycle/bio_J_per_cycle:.2e&#125;")</code></pre>
+
+  <p>The simulation runs 100,000 independent cycles in about 90 seconds and reports four numbers: the mean simulated cycle time (the molecule's own clock), the wall-clock time per simulated cycle (the silicon clock), the biological energy per cycle, and the silicon energy per cycle.</p>
+
+  <h4>Cross-checking against the master equation</h4>
+
+  <p>Stochastic simulations are easy to subtly miswrite, so before trusting the numbers I cross-checked against the analytical steady-state solution of the master equation. For a unicyclic chain the cycle flux <em>J</em> can be solved exactly by parametrising P<sub>i</sub> = A<sub>i</sub> &minus; B<sub>i</sub>&middot;J, walking around the cycle, and imposing P<sub>N</sub> = P<sub>0</sub>:</p>
+
+  <pre><code>def steady_state_flux(kf, kb):
+    n = len(kf)
+    A = np.empty(n + 1); B = np.empty(n + 1)
+    A[0], B[0] = 1.0, 0.0
+    for i in range(n):
+        A[i+1] = (kf[i] / kb[i]) * A[i]
+        B[i+1] = (kf[i] / kb[i]) * B[i] + 1.0 / kb[i]
+    J_unnorm = (A[n] - 1.0) / B[n]                 # cyclicity P_n = P_0 = 1
+    P_unnorm = A[:n] - B[:n] * J_unnorm
+    return J_unnorm / P_unnorm.sum()               # normalize to one molecule</code></pre>
+
+  <p>Analytical answer: <strong>J = 7.69 s<sup>&minus;1</sup></strong>. The Gillespie simulation lands at 7.67 s<sup>&minus;1</sup> &mdash; agreement to three significant figures, which is what convergence at 100,000 trials is expected to give. The simulation is sound.</p>
+
+  <h2>The Energy Ledger</h2>
+
+  <h4>Biology</h4>
+
+  <p>One full cycle hydrolyzes exactly one ATP. Under cellular conditions the free energy of ATP hydrolysis is &Delta;G &approx; &minus;50 kJ/mol. Dividing by Avogadro's number:</p>
+
+  <pre><code>E_bio = (50 &times; 10^3 J/mol) / (6.02 &times; 10^23 /mol)
+      &approx; 8.3 &times; 10^&minus;20 J per cycle</code></pre>
+
+  <p>That is the entire energy bill for one execution of the algorithm in biology &mdash; one molecule, one ATP, one trip around the cycle. It does not depend on how long the cycle took.</p>
+
+  <h4>Silicon</h4>
+
+  <p>The energy cost of one simulated cycle is wall-clock time &times; CPU active power. On the laptop I ran this on (Apple M-series), the simulation makes <strong>~1,700 stochastic transitions per cycle</strong> &mdash; many states sit near equilibrium and the molecule oscillates a lot before making net forward progress &mdash; and the wall-clock time per simulated cycle comes out to <strong>~880 microseconds</strong>. Active CPU package power on a single saturated core is in the 10&ndash;20 W range (measure your own with <code>powermetrics</code> while the simulation runs); 15 W is a reasonable midpoint. That gives:</p>
+
+  <pre><code>E_si = (8.8 &times; 10^&minus;4 s) &times; (15 W)
+     &approx; 1.3 &times; 10^&minus;2 J per cycle</code></pre>
+
+  <h4>Ratio</h4>
+
+  <pre><code>E_si / E_bio &approx; 1.3 &times; 10^&minus;2 / 8.3 &times; 10^&minus;20
+             &approx; 1.6 &times; 10^17</code></pre>
+
+  <p>Seventeen orders of magnitude.</p>
+
+  <h2>What This Number Means</h2>
+
+  <p>The first reaction is to assume something is wrong. Seventeen orders of magnitude is not a number that turns up in normal engineering comparisons. But the calculation is doing what we asked: it is comparing the cost of one execution of the same algorithm on two different substrates.</p>
+
+  <p>The gap is real, and it has a structural cause. Biology executes the algorithm at the molecular level &mdash; one protein, ~10 nm across, ~10<sup>5</sup> atoms, dissipating heat directly into the surrounding water. Silicon executes the algorithm by running an instruction stream on a chip with ~10<sup>10</sup> transistors, of which an enormous fraction are switching, leaking, and burning power regardless of the size of the computation being performed. The minimum unit of silicon "doing anything" is the entire active core. The minimum unit of biology doing anything is the protein.</p>
+
+  <p>Said differently: biology has zero overhead per molecule. The ATP is the entire bill. Silicon has near-infinite overhead &mdash; a fixed cost of running the chip at all &mdash; and the algorithm is whatever fits inside that fixed cost.</p>
+
+  <p>This is the fundamental observation that motivates neuromorphic computing. If you can build hardware whose minimum active unit is small (a single neuron-equivalent circuit with sub-nanowatt idle power), you can recover orders of magnitude. Mead, Indiveri, Boahen, the Loihi and SpiNNaker programs &mdash; all of this work is, at heart, an attempt to close the 10<sup>17</sup> gap.</p>
+
+  <h2>Caveats</h2>
+
+  <p>A few things to flag before reading too much into the exact figure.</p>
+
+  <p>The 50 kJ/mol for ATP hydrolysis is the cellular &Delta;G, which is more negative than the standard value (~30.5 kJ/mol) because the cytoplasmic ratio [ATP]/([ADP][Pi]) is far from equilibrium. Maintaining that disequilibrium has its own metabolic cost &mdash; mitochondrial respiration, oxygen delivery, blood flow. Strictly, biology's "true" cost per cycle is higher than 8.3 &times; 10<sup>&minus;20</sup> J. Including everything, the gap shrinks, but only by about an order of magnitude.</p>
+
+  <p>On the silicon side, 15 W is the active package power of one saturated core; it ignores RAM, motherboard, PSU losses, and cooling. Including everything, silicon's cost grows. The two corrections push in opposite directions and roughly cancel.</p>
+
+  <p>The 880 &micro;s/cycle is unoptimised CPython doing a Python-level Gillespie loop &mdash; a vectorised NumPy implementation, or a Numba/Cython compile of the inner loop, would be 10&ndash;100&times; faster. Even at the best plausible silicon implementation, the gap stays above 10<sup>15</sup>. The point of the comparison is structural, not micro-benchmark.</p>
+
+  <p>The simulation uses the linear forward Post-Albers chain rather than Heyse's full 15-state scheme with its cardiotonic-steroid-inhibited branches and uncoupled flux modes. Those branches carry no significant flux under physiological conditions, and the linear-chain turnover at 20&nbsp;&deg;C (7.7 s<sup>&minus;1</sup>) extrapolates by Q<sub>10</sub> &asymp; 3 onto Heyse's 37&nbsp;&deg;C measurement of 60&ndash;85 s<sup>&minus;1</sup>, so the simplification is not load-bearing for the energy ledger.</p>
+
+  <p>The conclusion is invariant under these adjustments: the gap is seventeen orders of magnitude, give or take one.</p>
+
+  <h2>What's Missing</h2>
+
+  <p>This calculation answers a clean question &mdash; <em>energy to perform the algorithm once</em> &mdash; but it leaves the bigger comparisons untouched.</p>
+
+  <h4>Throughput, not just cost</h4>
+
+  <p>A biological cell runs ~10<sup>9</sup> Na<sup>+</sup>/K<sup>+</sup>-ATPase pumps in parallel, each independently, with no scheduler. A CPU runs one. Per-cycle silicon is 10<sup>17</sup>&times; costlier; per-second-of-real-axon-time, the gap is far larger because biology is massively parallel and silicon is serial. The hardware comparison and the parallelism comparison are different questions, and only the first is settled here.</p>
+
+  <h4>Generality</h4>
+
+  <p>The Na<sup>+</sup>/K<sup>+</sup>-ATPase is a fixed-function machine. Silicon is general-purpose. Most of silicon's overhead pays for that generality &mdash; the same chip can run the pump, train a transformer, render a video. Biology only does what biology already evolved to do. The fair comparison is silicon-running-a-fixed-task vs biology-running-its-fixed-task; for any other task the biological side simply doesn't exist.</p>
+
+  <p>The 10<sup>17</sup> figure is best read as an upper bound on what neuromorphic and biomolecular computing might recover, not as an indictment of silicon. It is the size of the prize, not the size of the problem.</p>
+
+  <h2>What this means for the hardware bet</h2>
+
+  <p>Back to where we started. Of the ~$690B going into AI infrastructure in 2026, the overwhelming majority is being deployed on the assumption that the existing digital substrate is the right one and the only question is how to scale it more cheaply. The Unconventional AI bet &mdash; and the broader neuromorphic bet &mdash; is that there is a whole quantitative axis that conventional hardware cannot recover, and that progress beyond a certain point may require silicon that operates more like a protein than like a clocked digital pipeline.</p>
+
+  <p>Whether that bet pays off is a question about engineering, not just physics. Seventeen orders of magnitude is the headroom; how much of it is reachable depends on what you are willing to give up &mdash; generality, programmability, the ability to run an arbitrary instruction stream. Biology gives all of those up. A useful chip probably cannot. The interesting design space is the middle: how much of biology's structural efficiency can you keep while preserving enough of silicon's generality to be worth fabricating.</p>
+
+  <p>The number sets the ceiling. The roadmap is the rest.</p>
+
+  <hr class="my-12 border-border-light" />
+
+  <p class="text-body-md text-text-body-light"><em>Code for this post: <a href="https://github.com/Spandan-Madan/Statistical_Intuitions/blob/master/nakatpase.py">nakatpase.py</a>. Run it on your laptop, measure your own CPU power, and the numbers will land in the same order of magnitude.</em></p>
+</BlogPost>
