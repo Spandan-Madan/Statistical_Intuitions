@@ -2,7 +2,12 @@
 import Layout from "../layouts/Layout.astro";
 
 const articles = [
-  // Unlisted: hardware-efficiency-gap (May 2026) — keep the post reachable by URL but off the home page until ready to publish.
+  {
+    title: "The Efficiency Gap in Hardware Driving Biology and AI",
+    excerpt: "How do cells and GPUs compare when running the exact same algorithm? A single cycle of the Na⁺/K⁺-ATPase pump reveals a seventeen orders of magnitude gap between biological and silicon hardware.",
+    href: "/posts/hardware-efficiency-gap",
+    date: "May 2026",
+  },
   {
     title: "The Tool Architecture of Claude Code",
     excerpt: "A follow-up deep dive into the leaked source code, this time covering the tool system: 43+ tools, a 7-phase dispatch pipeline, layered permissions, and a concurrency scheduler that batches reads while serializing writes.",
