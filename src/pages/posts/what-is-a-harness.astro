@@ -1,0 +1,273 @@
+---
+import BlogPost from "../../layouts/BlogPost.astro";
+---
+
+<BlogPost title="What Is a Harness?" subtitle="A deep dive into the systems that turn language models into agents" date="June 2026">
+  <h2>Introduction</h2>
+
+  <p>Everyone is talking about agents, but the word is doing too much work. Claude Code is an agent. Devin is an agent. Manus is an agent. Browser-use is an agent. Hermes is an agent. LangGraph workflows are agents. Some of these write code, some operate browsers, some manage long-running tasks, and some are closer to programmable runtimes. Calling all of them "agents" hides the interesting part: the model is only one component of the system.</p>
+
+  <p>The better word is <strong>harness</strong>. A harness is the engineered system around a language model that gives it a body, senses, memory, permissions, and an operating loop. The model supplies the cognition. The harness decides what the model can see, what it can do, what it remembers, when it is allowed to act, and how its actions are turned into changes in the world.</p>
+
+  <p>This distinction matters because the same model can behave like very different products depending on the harness around it. Put a frontier model behind a chat UI and it answers questions. Put it behind a filesystem, shell, editor, patch tool, test runner, and permission system and it becomes a coding assistant. Put it behind a browser controller and screenshot loop and it becomes a computer-use agent. Put it inside a cloud VM with persistent state, task tracking, and recovery and it starts to look like a remote worker.</p>
+
+  <p>In previous posts, we looked at two pieces of Claude Code's harness in detail: <a href="/posts/claude-tools">the tool architecture</a> and <a href="/posts/anthropic-memory">the memory architecture</a>. This post zooms out. The goal is to define the general shape of a harness and build a taxonomy that applies not just to Claude Code, but also to Codex-style coding systems, OpenManus-style remote workers, browser-use/OpenClaw-style computer-use agents, and Hermes-style general agent runtimes.</p>
+
+  <h2>The Minimal Harness Loop</h2>
+
+  <p>At the center of every harness is a loop. The exact implementation varies, but the structure is almost always the same: observe the environment, construct a prompt, call the model, parse its response, execute an action, return the result, and continue until the task is done or the system decides to stop.</p>
+
+  <div class="not-prose w-full">
+    <div class="mermaid">
+      flowchart LR
+        OBS["<b>Observe</b>\nFiles, browser, memory, state"]
+        CTX["<b>Construct Context</b>\nPrompt + relevant environment"]
+        LLM["<b>Call Model</b>\nReasoning + tool decision"]
+        ACT["<b>Execute Action</b>\nTool, browser, shell, API"]
+        RES["<b>Return Result</b>\nObservation back to context"]
+        STOP["<b>Stop / Continue</b>\nDone, blocked, budget, approval"]
+
+        OBS --&gt; CTX --&gt; LLM --&gt; ACT --&gt; RES --&gt; STOP
+        STOP --&gt; OBS
+    </div>
+  </div>
+
+  <p>This loop is simple enough to fit in a diagram, but most of the engineering is hidden inside the boxes. What counts as an observation? Which files are included? How are tool schemas described? How are screenshots translated into model-readable state? What happens when the model calls the wrong tool? Who approves dangerous commands? How is the conversation compacted when the context window fills up? How does the system recover after a failed edit?</p>
+
+  <p>Those questions are the harness. The LLM is important, but the harness defines the world the LLM inhabits.</p>
+
+  <h2>The Five Layers</h2>
+
+  <p>A useful way to understand modern harnesses is to split them into five layers:</p>
+
+  <div class="not-prose grid grid-cols-1 md:grid-cols-2 gap-[16px] my-6">
+    <div class="group relative border border-[#d2d0d0] rounded-[12px] p-[20px] hover:border-[#4a9ae8] hover:shadow-md transition-all cursor-default">
+      <p class="font-bold text-text-heading mb-[6px] font-dm-sans">1. Tools / Action Layer</p>
+      <p class="text-body-sm text-text-body-light font-dm-sans">What the model can do to the outside world.</p>
+    </div>
+    <div class="group relative border border-[#d2d0d0] rounded-[12px] p-[20px] hover:border-[#4a9ae8] hover:shadow-md transition-all cursor-default">
+      <p class="font-bold text-text-heading mb-[6px] font-dm-sans">2. Memory / Persistence</p>
+      <p class="text-body-sm text-text-body-light font-dm-sans">What survives across turns, sessions, and tasks.</p>
+    </div>
+    <div class="group relative border border-[#d2d0d0] rounded-[12px] p-[20px] hover:border-[#4a9ae8] hover:shadow-md transition-all cursor-default">
+      <p class="font-bold text-text-heading mb-[6px] font-dm-sans">3. Context Construction</p>
+      <p class="text-body-sm text-text-body-light font-dm-sans">What the model sees right now.</p>
+    </div>
+    <div class="group relative border border-[#d2d0d0] rounded-[12px] p-[20px] hover:border-[#4a9ae8] hover:shadow-md transition-all cursor-default">
+      <p class="font-bold text-text-heading mb-[6px] font-dm-sans">4. Agent Runtime / Control Loop</p>
+      <p class="text-body-sm text-text-body-light font-dm-sans">How the model is called, resumed, interrupted, and bounded.</p>
+    </div>
+    <div class="group relative border border-[#d2d0d0] rounded-[12px] p-[20px] hover:border-[#4a9ae8] hover:shadow-md transition-all cursor-default md:col-span-2">
+      <p class="font-bold text-text-heading mb-[6px] font-dm-sans">5. Product Surface / Extensibility</p>
+      <p class="text-body-sm text-text-body-light font-dm-sans">How users control, extend, trust, and recover the system.</p>
+    </div>
+  </div>
+
+  <p>These layers show up in every serious harness. They do not show up with equal weight. A local coding harness emphasizes files, shell commands, patches, tests, and permissions. A browser harness emphasizes screenshots, DOM state, clicking, typing, and page navigation. A remote worker emphasizes persistence, task tracking, and recovery. A personal agent runtime emphasizes memory, integrations, scheduling, and extensibility.</p>
+
+  <p>But the same five questions keep coming back: what can it do, what does it remember, what does it see, how does the loop run, and how is the system exposed to users?</p>
+
+  <h2 id="tools">Layer 1: Tools / Action Layer</h2>
+
+  <p>The tool layer is the most visible part of a harness. It defines the actions available to the model. In a coding harness, these actions might be reading files, editing files, running shell commands, searching the repository, applying patches, running tests, or interacting with git. In a browser harness, they might be clicking, typing, scrolling, navigating, taking screenshots, inspecting DOM nodes, or extracting page content. In a general agent runtime, tools might be API calls, calendar actions, email actions, database queries, web searches, or custom functions registered by the developer.</p>
+
+  <p>Tools are not just functions. A mature tool layer usually includes schemas, validation, permissions, result mapping, concurrency rules, and UI rendering. The harness must decide which tools are available, how they are described to the model, whether a proposed call is valid, whether the user needs to approve it, how the result should be summarized, and whether multiple calls can run in parallel.</p>
+
+  <p>This is why "tool use" is a necessary but incomplete description of agents. Tools are the action interface. They say what the model can attempt. They do not, by themselves, explain what the model knows, how the loop continues, what gets remembered, or how failures are recovered.</p>
+
+  <h2 id="memory">Layer 2: Memory / Persistence</h2>
+
+  <p>Memory is the layer that lets a harness survive time. It answers the question: what should remain true after the current model call ends?</p>
+
+  <p>There are several kinds of persistence. Some are explicit memories: user preferences, project facts, long-term notes, background summaries, and learned conventions. Some are session artifacts: transcripts, task logs, resumable conversations, file snapshots, browser state, or VM state. Some are operational: cached titles, checkpoints, approval decisions, tool history, and recovery metadata.</p>
+
+  <p>Memory is related to context construction, but it is not the same thing. Memory is stored information. Context construction is the act of deciding what stored information, current environment state, and instructions are shown to the model on this turn. A memory can exist without being included in the prompt. Conversely, most context is not memory: a git diff, a selected code region, a screenshot, a tool schema, or a slash-command expansion may be included right now without being stored long-term.</p>
+
+  <p>This separation is important. Models do not operate over the world directly. They operate over a constructed representation of the world. Memory is one source for that representation, not the representation itself.</p>
+
+  <h2 id="context-construction">Layer 3: Context Construction</h2>
+
+  <p>Context construction is the least visible layer and often the most important one. It answers the question: what does the model see before it acts?</p>
+
+  <p>In a coding harness, context construction may include the system prompt, model-specific instructions, tool descriptions, project instructions, current working directory, git status, open files, selected editor text, recent terminal output, repository search results, user attachments, and memory snippets. In a browser harness, it may include a screenshot, accessibility tree, DOM summary, current URL, visible text, previous browser actions, and task objective. In a remote worker harness, it may include the task description, VM state, plan, task history, artifacts, browser state, and previous failures.</p>
+
+  <p>This layer is where a harness imposes ontology. The raw world is too large to fit into a context window. The harness chooses what matters, compresses it, orders it, labels it, and hides the rest. A model cannot reason about a repository, browser, or cloud machine except through the representation the harness gives it.</p>
+
+  <p>That is why two products using the same model can behave differently. They are not giving the model the same world. They are constructing different worlds.</p>
+
+  <h2 id="runtime">Layer 4: Agent Runtime / Control Loop</h2>
+
+  <p>The runtime is the machinery that turns one user request into a trajectory. It owns the loop: call the model, stream tokens, detect tool calls, execute actions, append observations, call the model again, and stop when some condition is reached.</p>
+
+  <p>A basic runtime can be a while loop around a model call and a tool dispatcher. A serious runtime has more responsibilities. It handles streaming, retries, model fallback, max-turn limits, rate limits, token budgets, cancellation, interruption, tool-result insertion, background tasks, subagents, and error recovery. It also manages context pressure through compaction: summarizing or trimming old state so the loop can continue inside a finite context window.</p>
+
+  <p>Compaction belongs here rather than in memory because it is not primarily about long-term recall. It is about keeping the active trajectory alive. The runtime must decide when the current conversation is too large, what can be summarized, what must be preserved verbatim, and how to avoid losing task-critical state.</p>
+
+  <p>This is the layer that makes the difference between a single model response and an agentic run.</p>
+
+  <h2 id="product-surface">Layer 5: Product Surface / Extensibility</h2>
+
+  <p>The product surface is what turns a harness from a backend loop into something people can actually use. It includes the terminal UI, web UI, editor integration, session list, task view, permission prompts, progress indicators, notifications, logs, remote control, plugin system, skill system, configuration files, and account integrations.</p>
+
+  <p>This layer is easy to dismiss as "just UI," but that is wrong. The product surface defines trust boundaries. It is where users approve dangerous actions, inspect what happened, resume old sessions, recover from mistakes, install extensions, configure MCP servers, and understand what the agent is doing. For coding agents, this layer decides whether the assistant feels like a black box or a controlled collaborator. For remote workers, it decides whether the user can supervise a long-running task without babysitting every step.</p>
+
+  <p>Extensibility also belongs here. Skills, plugins, MCP servers, and custom tool registries are the way harnesses grow new capabilities without changing the core model. They blur the boundary between product and platform: the harness is no longer just a fixed agent, but a runtime that can absorb new tools, new instructions, and new workflows.</p>
+
+  <h2>Four Harness Families</h2>
+
+  <p>The five-layer taxonomy is general, but different harness families emphasize different layers. Here are the four categories worth comparing.</p>
+
+  <div class="not-prose overflow-x-auto my-6">
+    <table class="w-full border-collapse font-dm-sans text-body-sm">
+      <thead>
+        <tr class="border-b border-[#d2d0d0]">
+          <th class="text-left p-[10px] font-bold text-text-heading">Harness family</th>
+          <th class="text-left p-[10px] font-bold text-text-heading">Examples</th>
+          <th class="text-left p-[10px] font-bold text-text-heading">Primary environment</th>
+          <th class="text-left p-[10px] font-bold text-text-heading">Engineering emphasis</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="border-b border-[#eeeeee]">
+          <td class="p-[10px]">Local work harness</td>
+          <td class="p-[10px]">Claude Code, Codex</td>
+          <td class="p-[10px]">Repository, terminal, filesystem, editor</td>
+          <td class="p-[10px]">Tools, local context, permissions, diffs, tests</td>
+        </tr>
+        <tr class="border-b border-[#eeeeee]">
+          <td class="p-[10px]">Remote worker harness</td>
+          <td class="p-[10px]">Devin, Manus, OpenManus</td>
+          <td class="p-[10px]">Cloud VM, browser, task workspace</td>
+          <td class="p-[10px]">Runtime, persistence, recovery, task tracking</td>
+        </tr>
+        <tr class="border-b border-[#eeeeee]">
+          <td class="p-[10px]">Browser / computer-use harness</td>
+          <td class="p-[10px]">browser-use, OpenClaw</td>
+          <td class="p-[10px]">Browser or GUI computer</td>
+          <td class="p-[10px]">Observation, clicking, typing, page state</td>
+        </tr>
+        <tr>
+          <td class="p-[10px]">General agent runtime</td>
+          <td class="p-[10px]">Hermes Agent, LangGraph-style systems</td>
+          <td class="p-[10px]">Abstract tools, APIs, workflows, memory</td>
+          <td class="p-[10px]">Extensibility, memory, orchestration</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>A local coding harness is optimized for a developer-controlled workspace. Its body is the filesystem and shell. Its senses are file reads, repository search, terminal output, git state, and editor context. Its actions are edits, commands, patches, and tests. The central problem is not whether the model can think about code; it is whether the harness can safely expose enough of the local workspace for the model to make correct changes.</p>
+
+  <p>A remote worker harness moves the environment into the cloud. The agent gets a persistent workspace, often including a browser, shell, filesystem, and task history. The central problem becomes autonomy over time: how to preserve state, recover from mistakes, track progress, expose intermediate artifacts, and let the user supervise without micromanaging.</p>
+
+  <p>A browser or computer-use harness gives the model an interface to existing software. Instead of a clean API, the agent must operate through visual state, DOM state, mouse actions, keyboard actions, and navigation. The hard part is grounding: deciding what the model can see, whether a click landed correctly, whether a page changed, and how to recover when the UI behaves unexpectedly.</p>
+
+  <p>A general agent runtime is less tied to one environment. It gives developers a way to register tools, define workflows, wire memory, schedule tasks, connect apps, and orchestrate multi-step behavior. In this family, the harness is closer to infrastructure: a programmable substrate for building many agents rather than one specific product.</p>
+
+  <h2>Deep Dive: Claude Code / Codex</h2>
+
+  <p>Claude Code and Codex-style systems are local work harnesses. Their main design choice is to treat the developer's machine as the agent's environment. The harness is wrapped around a repository, a terminal, a filesystem, and often an editor. This gives the model a concrete body: it can inspect files, edit them, run commands, search the codebase, execute tests, and summarize the resulting diff.</p>
+
+  <p>The tool layer is therefore unusually important. The model is not merely calling generic APIs; it is operating on a live workspace where mistakes can corrupt files, delete work, or run dangerous commands. That is why coding harnesses invest heavily in permission checks, read/write distinctions, shell gating, patch application, command rendering, and user-visible diffs. The harness has to expose enough power for useful work while keeping the user in control.</p>
+
+  <p>The context construction layer is just as important. A coding model needs more than the user's message. It needs project instructions, current directory, git state, visible editor context, recent terminal output, tool descriptions, repository search results, and sometimes memories or saved project conventions. The harness chooses which of these become part of the prompt. This is where the coding assistant's "understanding" of the repository is actually assembled.</p>
+
+  <p>The runtime then turns one request into a coding trajectory. The loop looks like: inspect files, reason about the change, edit, run tests, observe failures, edit again, and stop when the result is good enough. The hard runtime problems are interruption, retries, context compaction, max-turn limits, partial failures, and transcript persistence. In practice, the difference between a toy coding agent and a usable one is not whether it can call <code>bash</code>; it is whether the harness can manage this trajectory without losing state or surprising the user.</p>
+
+  <p>The product surface is also deeper than it looks. Terminal rendering, progress indicators, todo lists, permission prompts, session resume, plugin loading, MCP servers, and remote bridges are all part of the harness. They determine whether the system feels like a transparent collaborator or a black box that occasionally mutates your repository.</p>
+
+  <h2>Deep Dive: OpenManus</h2>
+
+  <p>OpenManus is a good example of the remote-worker style of harness, even though it should not be treated as proven architectural evidence for proprietary Manus. The interesting part is the shape: a general-purpose agent wrapped around tools for Python execution, browser use, file editing, human asking, termination, and MCP-provided extensions.</p>
+
+  <p>Its core loop follows a ReAct-like pattern. A base agent stores messages in memory, tracks state, runs step by step, enforces a maximum step count, and detects repeated/stuck behavior. The tool-calling agent asks the LLM for the next action, parses tool calls, executes them through a <code>ToolCollection</code>, appends observations back into memory, and stops when a special termination tool fires. That is the harness in miniature: state, tools, observations, stop conditions.</p>
+
+  <p>The tool layer is broader than a coding harness but less specialized. OpenManus exposes a Python executor, browser tool, string-replace editor, human-question tool, terminate tool, and dynamically connected MCP tools. This makes it a general task worker rather than a pure coding system. It can compute, browse, edit workspace files, ask for missing information, and expand its capabilities through external servers.</p>
+
+  <p>The planning flow is the key remote-worker ingredient. OpenManus has a planning layer that creates an explicit plan, marks steps as in-progress or completed, chooses an executor for the current step, and runs that executor against a step-specific prompt. This is a different emphasis from Claude Code. A local coding harness often centers around the immediate user request and repository loop; a remote worker harness centers around task decomposition and durable progress.</p>
+
+  <p>Memory and persistence are present, but the important distinction is that the harness carries task state through steps. The model does not simply answer once. It advances through a managed sequence: plan, execute current step, mark progress, continue. That is why remote-worker harnesses need recovery and supervision surfaces. If the task is long-running, the user needs to know what step the agent is on, what artifacts exist, what failed, and whether the worker is stuck.</p>
+
+  <h2>Deep Dive: browser-use / OpenClaw</h2>
+
+  <p>Browser-use and OpenClaw-style systems are browser/computer-use harnesses. Their defining feature is that the model's world is not a clean programmatic API. The world is a browser or GUI surface. The harness must convert pixels, DOM state, page metadata, tabs, URLs, screenshots, and recent events into a prompt the model can act on.</p>
+
+  <p>This changes the action layer. Instead of "edit this file" or "run this command," the primitive actions are things like navigate, click, type, scroll, switch tabs, go back, upload a file, extract content, search the page, save a PDF, and wait. In browser-use, these actions are registered through a tool registry and compiled into an action model for the LLM. The model chooses structured actions; the harness executes them against a browser session and returns an <code>ActionResult</code>.</p>
+
+  <p>The context construction problem is harder than it first appears. A screenshot is useful but imprecise. A DOM tree is precise but often too large and not always aligned with what the user sees. An accessibility tree may capture interactive structure but miss visual layout. A robust browser harness has to combine these signals into a bounded state summary: current URL, title, tabs, visible DOM, screenshot, scroll position, browser errors, pending network requests, and previous interactions.</p>
+
+  <p>The runtime is also different. Browser actions are probabilistic in a way file reads are not. Clicks can miss. Pages can navigate slowly. Popups can appear. Login walls can block progress. Elements can move. The harness therefore needs action timeouts, failure counts, loop detection, step limits, page extraction helpers, and often a judge or evaluator that decides whether the previous goal succeeded.</p>
+
+  <p>This family makes the "embodiment" idea especially clear. The model does not actually use a computer. The harness gives it a very particular computer-shaped body: browser state as senses, click/type/scroll as muscles, and action results as proprioception. Better browser agents are mostly better harnesses: better observation, better grounding, better action validation, and better recovery.</p>
+
+  <h2>Deep Dive: Hermes Agent</h2>
+
+  <p>Hermes is closer to a general agent runtime than a single-purpose product. Its center of gravity is not one environment like a repo or browser. It is a registry of tools, toolsets, skills, memory, browser/terminal integrations, cron jobs, delegation, and plugin hooks. This makes it useful for understanding harnesses as platforms.</p>
+
+  <p>The tool layer is registry-first. Tool modules self-register schemas, handlers, metadata, toolset membership, availability checks, and result limits. A separate model-tools layer discovers those tools, filters them by enabled or disabled toolsets, defers large tool catalogs behind search/describe/call bridge tools, dispatches function calls, applies middleware, runs pre-tool and post-tool hooks, and canonicalizes tool results before they return to the model.</p>
+
+  <p>That architecture exposes a different harness problem: tool abundance. If a runtime can connect many built-in tools, MCP tools, plugin tools, and skill-provided tools, dumping every schema into the model context is wasteful and confusing. Hermes-style systems need tool search, tool descriptions, scoped toolsets, availability checks, and lazy discovery. The harness is not just giving the model tools; it is managing the model's access to a large tool universe.</p>
+
+  <p>Memory is also more central. Hermes has file-backed curated memory with separate stores for agent memory and user memory. The interesting detail is the frozen snapshot pattern: memory is loaded into the system prompt at session start, while mid-session writes update disk but do not mutate the already-cached system prompt. This is a harness-level tradeoff between persistence, safety, and prompt-cache stability.</p>
+
+  <p>The product and extensibility surface is the point. Skills, cron jobs, browser tools, terminal tools, file tools, voice tools, MCP OAuth, delegation, tool middleware, approval systems, and TUI state are not add-ons; they are the runtime. Hermes shows the harness as an operating environment for agents rather than a narrow application. In this category, the core question is not "can the model complete this one task?" It is "how many kinds of tasks can this runtime safely host?"</p>
+
+  <h2>Why Tool Use Is Not Enough</h2>
+
+  <p>It is tempting to say all of these systems are "basically tool calls orchestrated by a model." That is directionally right, but incomplete. The phrase captures the action layer and misses the rest of the harness.</p>
+
+  <p>The hard questions are not only "which tools exist?" They are also:</p>
+
+  <ul>
+    <li>What does the model know before it chooses a tool?</li>
+    <li>What state is hidden from the model?</li>
+    <li>What information is retrieved from memory?</li>
+    <li>What actions require user approval?</li>
+    <li>How are failed actions represented back to the model?</li>
+    <li>When does the loop stop?</li>
+    <li>How does the system recover after a bad edit, wrong click, or broken command?</li>
+    <li>What can be resumed tomorrow?</li>
+  </ul>
+
+  <p>Those decisions are not incidental. They define the agent's behavior as much as the model weights do. A model with poor context construction will act confidently on the wrong world. A model with powerful tools but weak permissions is dangerous. A model with memory but no retrieval discipline will remember irrelevant things and miss important ones. A model with no runtime limits will loop forever. A model with no product surface will be impossible to trust.</p>
+
+  <h2>A Worked Example</h2>
+
+  <p>Suppose a user asks: "Fix the failing authentication tests."</p>
+
+  <p>In a local coding harness, the system first constructs context: current directory, repository instructions, git state, recent files, maybe previous memory about testing conventions. The model decides to inspect the test failure. It calls a shell tool to run the relevant tests. The runtime streams the command output back into the conversation. The model reads files, searches for authentication logic, edits code, reruns tests, and stops when the result is clean. Permissions may gate commands or edits. The product surface shows progress, diffs, and final summary.</p>
+
+  <p>In a remote worker harness, the same request may happen inside a cloud workspace. The agent may clone the repo, install dependencies, run tests, open a browser, persist logs, and expose a task timeline. If the session disconnects, it should resume. If tests take a long time, the user should be able to come back later. The model is still making decisions, but the harness is carrying the task across time.</p>
+
+  <p>In a browser harness, "fix the failing authentication tests" might instead mean operating a web dashboard or CI system: open the page, inspect logs, click into a failing run, copy an error, navigate to GitHub, and perhaps trigger a rerun. The action layer is no longer direct file editing; it is browser control. The context is no longer just text; it is screenshots, DOM, and page state.</p>
+
+  <p>In a general agent runtime, the same workflow might be built as a graph or agent program. One node reads CI status, another searches code, another proposes a patch, another asks for approval, another opens a pull request. Here the harness is an orchestration substrate.</p>
+
+  <p>The model may be similar in all four cases. The harness is not.</p>
+
+  <h2>Summary</h2>
+
+  <p>A harness is the control system that turns a language model into an actor. It gives the model an environment, packages that environment into context, exposes actions through tools, persists selected state through memory, runs the multi-step loop, and gives users a surface for control and trust.</p>
+
+  <p>The five-layer taxonomy is:</p>
+
+  <ol>
+    <li><strong>Tools / Action Layer</strong> &mdash; what the model can do.</li>
+    <li><strong>Memory / Persistence</strong> &mdash; what survives over time.</li>
+    <li><strong>Context Construction</strong> &mdash; what the model sees right now.</li>
+    <li><strong>Agent Runtime / Control Loop</strong> &mdash; how the trajectory executes.</li>
+    <li><strong>Product Surface / Extensibility</strong> &mdash; how users control, extend, and recover the system.</li>
+  </ol>
+
+  <p>This taxonomy applies across Claude Code, Codex, OpenManus, browser-use, OpenClaw, Hermes, and similar systems. The differences are in emphasis. Coding harnesses focus on local workspace actions. Browser harnesses focus on GUI grounding. Remote workers focus on persistence and recovery. General runtimes focus on orchestration and extensibility.</p>
+
+  <h2>Learnings</h2>
+
+  <p>The main learning is that we have put a lot of faith into the model itself. Better models clearly matter. They reason better, write better code, follow instructions better, and recover from mistakes more often. But the deeper realization from looking at these systems is that LLMs by themselves are not sufficient to achieve real-world tasks.</p>
+
+  <p>A raw model does not have a filesystem. It does not have a browser. It does not know which files matter, which commands are safe, what state should persist, when to ask for approval, how to recover from a bad edit, or how to resume tomorrow. All of that has to be built around it. The harness is that surrounding software system.</p>
+
+  <p>This is why agent progress is not just model progress. It is also ordinary, difficult software engineering: tool design, permissioning, context construction, memory policy, runtime control, error handling, UI, observability, plugins, sandboxing, and recovery. The harness is what turns model capability into real-world work.</p>
+
+  <p>The useful mental model is therefore not simply "the model uses tools." It is: the harness gives the model embodiment. It defines the model's senses, body, memory, permissions, and operating loop. Once you see that, the agent landscape becomes less mysterious. The important question is not "is this an agent?" The important question is: what harness has been built around the model?</p>
+</BlogPost>
